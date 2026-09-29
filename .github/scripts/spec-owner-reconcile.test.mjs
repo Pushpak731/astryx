@@ -90,6 +90,7 @@ function createHarness({
   labels = [],
   autoMerge = null,
   draft = false,
+  baseRef = 'main',
   onPullGet,
   onCreateStatus,
   onEnableAutoMerge,
@@ -121,7 +122,8 @@ function createHarness({
       head: {sha: head, repo: {full_name: headRepository}},
       base: {
         sha: '2222222222222222222222222222222222222222',
-        repo: {full_name: repository},
+        ref: baseRef,
+        repo: {full_name: repository, default_branch: 'main'},
       },
       changed_files: files.length,
       labels: [],
@@ -1548,6 +1550,121 @@ describe('spec owner workflow reconciliation', () => {
 
       expect(harness.state.calls).not.toContain('create-comment');
       expect(latestGateStatus(harness.state).state).toBe('success');
+    });
+  });
+
+  describe('a PR based on another PR branch', () => {
+    const stacked = 'feature/lower';
+
+    it('waits for exact-head owner approval like a main-based PR', async () => {
+      const harness = createHarness({baseRef: stacked});
+
+      await run(harness, context({runId: 100n}));
+
+      expect(latestGateStatus(harness.state)).toMatchObject({
+        state: 'pending',
+        description: expect.stringContaining('engineering owner'),
+      });
+      expect(harness.state.labels.has('needs:spec-owner-review')).toBe(true);
+    });
+
+    it('does not let an older-head approval clear the current head', async () => {
+      const harness = createHarness({
+        baseRef: stacked,
+        reviews: [{...specOwnerReview, commit_id: nextHead}],
+      });
+
+      await run(harness, context({runId: 100n}));
+
+      expect(latestGateStatus(harness.state).state).toBe('pending');
+    });
+
+    it('publishes exact-head approval but never enables auto-merge', async () => {
+      const harness = createApprovedHarness({baseRef: stacked});
+
+      await run(harness, context({runId: 100n}));
+
+      expect(latestGateStatus(harness.state)).toMatchObject({
+        state: 'success',
+        description: expect.stringContaining('Approved by @imdreamrunner'),
+      });
+      expect(harness.state.calls).not.toContain('enable-auto-merge');
+      expect(harness.state.labels.has('spec-auto-merge')).toBe(false);
+      expect(harness.state.pr.auto_merge).toBe(null);
+      expect(
+        harness.state.calls.some(call => call.includes('Stacked pull request')),
+      ).toBe(true);
+    });
+
+    it('withdraws gate-owned auto-merge after a retarget away from main', async () => {
+      const harness = createApprovedHarness({
+        baseRef: stacked,
+        labels: ['spec-auto-merge'],
+        autoMerge: {merge_method: 'squash'},
+      });
+
+      await run(
+        harness,
+        context({
+          runId: 100n,
+          eventName: 'pull_request_target',
+          action: 'edited',
+        }),
+      );
+
+      expect(latestGateStatus(harness.state).state).toBe('success');
+      expect(harness.state.calls).toContain('disable-auto-merge');
+      expect(harness.state.pr.auto_merge).toBe(null);
+      expect(harness.state.labels.has('spec-auto-merge')).toBe(false);
+    });
+
+    it('leaves auto-merge a person enabled on a stacked PR alone', async () => {
+      const harness = createApprovedHarness({
+        baseRef: stacked,
+        autoMerge: {merge_method: 'squash'},
+      });
+
+      await run(harness, context({runId: 100n, action: 'auto_merge_enabled'}));
+
+      expect(harness.state.calls).not.toContain('disable-auto-merge');
+      expect(harness.state.pr.auto_merge).toEqual({merge_method: 'squash'});
+    });
+
+    it('abandons a snapshot whose base changes mid-read', async () => {
+      const harness = createApprovedHarness({
+        onPullGet: (count, state) => {
+          if (count === 3) state.pr.base.ref = stacked;
+        },
+      });
+
+      await run(harness, context({runId: 100n}));
+
+      expect(latestGateStatus(harness.state)).toMatchObject({
+        state: 'pending',
+        description: expect.stringContaining('Reconciling'),
+      });
+      expect(harness.state.calls).not.toContain('enable-auto-merge');
+      expect(
+        harness.state.calls.some(call =>
+          call.includes('head or base changed while this run was reading'),
+        ),
+      ).toBe(true);
+    });
+
+    it('does not enable auto-merge after a retarget lands behind the decision', async () => {
+      const harness = createApprovedHarness({
+        onPullGet: (_count, state) => {
+          if (state.calls.includes('status:spec-owner-approval:success')) {
+            state.pr.base.ref = stacked;
+          }
+        },
+      });
+
+      await run(harness, context({runId: 100n}));
+
+      expect(latestGateStatus(harness.state).state).toBe('success');
+      expect(harness.state.calls).not.toContain('enable-auto-merge');
+      expect(harness.state.pr.auto_merge).toBe(null);
     });
   });
 });

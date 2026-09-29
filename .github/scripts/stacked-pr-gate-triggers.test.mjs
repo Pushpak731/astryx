@@ -1,0 +1,374 @@
+// Copyright (c) Meta Platforms, Inc. and affiliates.
+
+/**
+ * @file Trigger contract for the review gates on stacked pull requests.
+ * @input review-signal.yml and spec-owner-gate.yml, evaluated for simulated
+ *   pull request events against main and against another pull request's branch.
+ * @output Assertions that both gates start for stacked and main-based pull
+ *   requests, re-run on base changes, and ignore title/body edits.
+ * @position Node regression coverage for the gate workflows' `on`, `if`, and
+ *   `concurrency` blocks; the scripts themselves are covered elsewhere.
+ */
+
+import fs from 'node:fs';
+import path from 'node:path';
+import {describe, expect, it} from 'vitest';
+import YAML from 'yaml';
+
+const root = path.resolve(import.meta.dirname, '../..');
+const load = name =>
+  YAML.parse(
+    fs.readFileSync(path.join(root, '.github/workflows', name), 'utf8'),
+  );
+const reviewSignal = load('review-signal.yml');
+const specOwnerGate = load('spec-owner-gate.yml');
+
+const REPOSITORY = 'facebook/astryx';
+const RUN_ID = '987654321';
+const STACKED_BASE = 'feature/lower';
+
+// --- A small evaluator for the GitHub Actions expression subset used here. ---
+
+function tokenize(source) {
+  const tokens = [];
+  let index = 0;
+  while (index < source.length) {
+    const rest = source.slice(index);
+    const space = /^\s+/.exec(rest);
+    if (space) {
+      index += space[0].length;
+      continue;
+    }
+    const string = /^'((?:[^']|'')*)'/.exec(rest);
+    if (string) {
+      tokens.push({type: 'value', value: string[1].replace(/''/g, "'")});
+      index += string[0].length;
+      continue;
+    }
+    const operator = /^(==|!=|&&|\|\||!|\(|\)|,)/.exec(rest);
+    if (operator) {
+      tokens.push({type: 'op', value: operator[1]});
+      index += operator[1].length;
+      continue;
+    }
+    const word = /^[A-Za-z_][A-Za-z0-9_.-]*/.exec(rest);
+    if (word) {
+      tokens.push({type: 'word', value: word[0]});
+      index += word[0].length;
+      continue;
+    }
+    throw new Error(`Unsupported expression syntax at: ${rest}`);
+  }
+  return tokens;
+}
+
+const truthy = value =>
+  value !== null &&
+  value !== undefined &&
+  value !== false &&
+  value !== 0 &&
+  value !== '';
+
+function looseEquals(left, right) {
+  if (typeof left === 'string' && typeof right === 'string') {
+    return left.toLowerCase() === right.toLowerCase();
+  }
+  return (left ?? null) === (right ?? null);
+}
+
+const FUNCTIONS = {
+  startsWith: (value, prefix) =>
+    String(value ?? '')
+      .toLowerCase()
+      .startsWith(String(prefix ?? '').toLowerCase()),
+  contains: (haystack, needle) =>
+    Array.isArray(haystack)
+      ? haystack.some(item => looseEquals(item, needle))
+      : String(haystack ?? '')
+          .toLowerCase()
+          .includes(String(needle ?? '').toLowerCase()),
+  fromJSON: value => JSON.parse(value),
+};
+
+function evaluate(source, context) {
+  const tokens = tokenize(source);
+  let position = 0;
+  const peek = () => tokens[position];
+  const take = expected => {
+    const token = tokens[position++];
+    if (expected && token?.value !== expected) {
+      throw new Error(`Expected ${expected} in: ${source}`);
+    }
+    return token;
+  };
+  function lookup(name) {
+    if (name === 'null') return null;
+    if (name === 'true') return true;
+    if (name === 'false') return false;
+    return name
+      .split('.')
+      .reduce(
+        (value, key) => (value == null ? null : (value[key] ?? null)),
+        context,
+      );
+  }
+  function primary() {
+    const token = take();
+    if (token.type === 'value') return token.value;
+    if (token.value === '(') {
+      const value = or();
+      take(')');
+      return value;
+    }
+    if (token.type === 'word' && peek()?.value === '(') {
+      take('(');
+      const args = [];
+      while (peek()?.value !== ')') {
+        args.push(or());
+        if (peek()?.value === ',') take(',');
+      }
+      take(')');
+      return FUNCTIONS[token.value](...args);
+    }
+    if (token.type === 'word') return lookup(token.value);
+    throw new Error(`Unexpected token ${token.value} in: ${source}`);
+  }
+  function unary() {
+    if (peek()?.value === '!') {
+      take('!');
+      return !truthy(unary());
+    }
+    return primary();
+  }
+  function equality() {
+    let left = unary();
+    while (peek()?.value === '==' || peek()?.value === '!=') {
+      const operator = take().value;
+      const equal = looseEquals(left, unary());
+      left = operator === '==' ? equal : !equal;
+    }
+    return left;
+  }
+  function and() {
+    let left = equality();
+    while (peek()?.value === '&&') {
+      take('&&');
+      const right = equality();
+      left = truthy(left) ? right : left;
+    }
+    return left;
+  }
+  function or() {
+    let left = and();
+    while (peek()?.value === '||') {
+      take('||');
+      const right = and();
+      left = truthy(left) ? left : right;
+    }
+    return left;
+  }
+  const value = or();
+  if (position !== tokens.length) {
+    throw new Error(`Trailing tokens in: ${source}`);
+  }
+  return value;
+}
+
+const interpolate = (template, context) =>
+  template.replace(/\$\{\{([\s\S]*?)\}\}/g, (_match, expression) =>
+    String(evaluate(expression, context)),
+  );
+
+// --- GitHub's trigger matching for the events the gates subscribe to. ---
+
+const DEFAULT_TYPES = {
+  pull_request_target: ['opened', 'synchronize', 'reopened'],
+};
+
+function globToRegExp(pattern) {
+  const escaped = pattern
+    .split('**')
+    .map(part =>
+      part
+        .split('*')
+        .map(piece => piece.replace(/[.+?^${}()|[\]\\]/g, '\\$&'))
+        .join('[^/]*'),
+    )
+    .join('.*');
+  return new RegExp(`^${escaped}$`);
+}
+
+function workflowTriggers(workflow, event) {
+  const trigger = workflow.on[event.name];
+  if (trigger === undefined) return false;
+  const config = trigger ?? {};
+  const types = config.types ?? DEFAULT_TYPES[event.name];
+  if (types && event.action && !types.includes(event.action)) return false;
+  if (event.baseRef !== undefined) {
+    if (
+      config.branches &&
+      !config.branches.some(pattern =>
+        globToRegExp(pattern).test(event.baseRef),
+      )
+    ) {
+      return false;
+    }
+    if (
+      config['branches-ignore'] &&
+      config['branches-ignore'].some(pattern =>
+        globToRegExp(pattern).test(event.baseRef),
+      )
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function pullRequestEvent({action, baseRef = 'main', changes, review}) {
+  const eventName = review ? 'pull_request_review' : 'pull_request_target';
+  const payload = {
+    action,
+    changes,
+    review,
+    pull_request: {
+      number: 42,
+      base: {ref: baseRef, repo: {full_name: REPOSITORY}},
+      head: {ref: 'feature/upper', repo: {full_name: REPOSITORY}},
+    },
+    repository: {full_name: REPOSITORY, default_branch: 'main'},
+  };
+  return {
+    event: {name: eventName, action, baseRef},
+    context: {
+      github: {
+        event_name: eventName,
+        event: payload,
+        repository: REPOSITORY,
+        run_id: RUN_ID,
+      },
+    },
+  };
+}
+
+function runningJobs(workflow, {event, context}) {
+  if (!workflowTriggers(workflow, event)) return [];
+  return Object.entries(workflow.jobs)
+    .filter(
+      ([, job]) => job.if === undefined || truthy(evaluate(job.if, context)),
+    )
+    .map(([name]) => name);
+}
+
+const concurrencyGroup = (workflow, {context}) =>
+  interpolate(workflow.concurrency.group, context);
+
+const retarget = from => ({base: {ref: {from}, sha: {from: '0'.repeat(40)}}});
+
+describe('stacked pull request gate triggers', () => {
+  it('keeps both gates free of a base-branch filter', () => {
+    for (const workflow of [reviewSignal, specOwnerGate]) {
+      expect(workflow.on.pull_request_target.branches).toBeUndefined();
+      expect(
+        workflow.on.pull_request_target['branches-ignore'],
+      ).toBeUndefined();
+    }
+  });
+
+  it.each([
+    'opened',
+    'synchronize',
+    'reopened',
+    'ready_for_review',
+    'converted_to_draft',
+  ])('starts both gates on %s for main-based and stacked PRs', action => {
+    for (const baseRef of ['main', STACKED_BASE]) {
+      const event = pullRequestEvent({action, baseRef});
+      expect(
+        runningJobs(reviewSignal, event),
+        `${action} on ${baseRef}`,
+      ).toEqual(['flag']);
+      expect(
+        runningJobs(specOwnerGate, event),
+        `${action} on ${baseRef}`,
+      ).toEqual(['reconcile']);
+    }
+  });
+
+  it('reconciles the spec gate when auto-merge is enabled on a stacked PR', () => {
+    const event = pullRequestEvent({
+      action: 'auto_merge_enabled',
+      baseRef: STACKED_BASE,
+    });
+    expect(runningJobs(specOwnerGate, event)).toEqual(['reconcile']);
+    expect(runningJobs(reviewSignal, event)).toEqual([]);
+  });
+
+  it.each([
+    ['onto another PR branch', STACKED_BASE, 'main'],
+    ['back to main', 'main', STACKED_BASE],
+  ])(
+    're-runs both gates when a PR is retargeted %s',
+    (_name, baseRef, from) => {
+      const event = pullRequestEvent({
+        action: 'edited',
+        baseRef,
+        changes: retarget(from),
+      });
+      expect(runningJobs(reviewSignal, event)).toEqual(['flag']);
+      expect(runningJobs(specOwnerGate, event)).toEqual(['reconcile']);
+    },
+  );
+
+  it('ignores title and body edits without cancelling an in-flight flag run', () => {
+    const edit = pullRequestEvent({
+      action: 'edited',
+      baseRef: STACKED_BASE,
+      changes: {title: {from: 'Old title'}},
+    });
+    expect(runningJobs(reviewSignal, edit)).toEqual([]);
+    expect(runningJobs(specOwnerGate, edit)).toEqual([]);
+
+    const push = pullRequestEvent({
+      action: 'synchronize',
+      baseRef: STACKED_BASE,
+    });
+    const baseChange = pullRequestEvent({
+      action: 'edited',
+      baseRef: 'main',
+      changes: retarget(STACKED_BASE),
+    });
+    expect(concurrencyGroup(reviewSignal, push)).toBe('review-signal-42');
+    // A retarget supersedes a run still classifying the old base.
+    expect(concurrencyGroup(reviewSignal, baseChange)).toBe('review-signal-42');
+    expect(concurrencyGroup(reviewSignal, edit)).toBe(
+      `review-signal-${RUN_ID}`,
+    );
+  });
+
+  it('keeps review events and manual dispatch unchanged', () => {
+    const approval = pullRequestEvent({
+      action: 'submitted',
+      baseRef: STACKED_BASE,
+      review: {state: 'approved'},
+    });
+    expect(runningJobs(reviewSignal, approval)).toEqual(['review-anchor']);
+    expect(runningJobs(specOwnerGate, approval)).toEqual(['reconcile']);
+    expect(concurrencyGroup(reviewSignal, approval)).toBe('review-signal-42');
+
+    const dispatch = {
+      event: {name: 'workflow_dispatch'},
+      context: {
+        github: {
+          event_name: 'workflow_dispatch',
+          event: {inputs: {pr: '42'}},
+          repository: REPOSITORY,
+          run_id: RUN_ID,
+        },
+      },
+    };
+    expect(runningJobs(reviewSignal, dispatch)).toEqual(['flag']);
+    expect(runningJobs(specOwnerGate, dispatch)).toEqual(['reconcile']);
+    expect(concurrencyGroup(reviewSignal, dispatch)).toBe('review-signal-42');
+  });
+});

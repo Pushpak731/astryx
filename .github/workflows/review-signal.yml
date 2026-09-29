@@ -51,17 +51,33 @@
 # Uses pull_request_target so it can label / request reviewers / disable
 # auto-merge on fork PRs. It reads the PR file list, diff text, and changed Core
 # base/head source bytes as inert API data. The approval helper comes from the
-# trusted workflow SHA; the visual classifier comes from the PR base ref. It reads
+# trusted workflow SHA; the visual classifier comes from the PR base commit when
+# the PR targets the default branch, and from the workflow SHA otherwise. It reads
 # eng/design owner lists from repository VARIABLES (vars.ENGOWNERS /
 # vars.DESIGNOWNERS) — no checkout and no execution of PR-controlled code.
 # Do not add checkout or build steps here.
+#
+# Stacked PRs (based on another PR's branch) are flagged too. GitHub always runs
+# pull_request_target from the default branch, with GITHUB_SHA at its tip, so a
+# non-default base cannot choose the workflow or helper code. A base change
+# re-flags the PR against its new base; title/body edits do not.
 
 name: Review signal
 
 on:
+  # No base-branch filter: a PR stacked on another PR's branch needs the gate as
+  # much as a main-based one. `edited` is admitted only for base changes (see
+  # the flag job's condition).
   pull_request_target:
-    branches: ['main']
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft]
+    types:
+      [
+        opened,
+        synchronize,
+        reopened,
+        ready_for_review,
+        converted_to_draft,
+        edited,
+      ]
   pull_request_review:
     types: [submitted, dismissed]
   # Manual re-trigger. The App only auto-runs on the PR events above, so if it
@@ -81,7 +97,9 @@ permissions: {}
 concurrency:
   # One group per PR for the event/single-dispatch paths; a run-scoped group for
   # the backfill-all dispatch so it is never cancelled by an unrelated re-run.
-  group: review-signal-${{ github.event.pull_request.number || github.event.inputs.pr || github.run_id }}
+  # A title/body edit never flags, so it is run-scoped too: it must not cancel
+  # an in-flight flag run for the same PR.
+  group: review-signal-${{ (github.event.action == 'edited' && !github.event.changes.base) && github.run_id || github.event.pull_request.number || github.event.inputs.pr || github.run_id }}
   cancel-in-progress: true
 
 env:
@@ -95,7 +113,8 @@ jobs:
   # ---------------------------------------------------------------------------
   flag:
     if: >-
-      github.event_name == 'pull_request_target'
+      (github.event_name == 'pull_request_target' &&
+       (github.event.action != 'edited' || github.event.changes.base != null))
       || github.event_name == 'workflow_dispatch'
     name: Flag review signals
     runs-on: ubuntu-slim
@@ -139,7 +158,15 @@ jobs:
                 core.info(`Backfill: re-flagging ${prs.length} open PR(s).`);
               }
             } else {
-              prs = [context.payload.pull_request];
+              // The payload is a snapshot from when GitHub queued the event. A
+              // push or retarget can land before this job starts (a base change
+              // between the two made the file count below disagree with a stale
+              // payload), so classify the live PR. A base change queues its own
+              // run, so a mid-run retarget still fails closed and re-flags.
+              const { data } = await github.rest.pulls.get({
+                owner, repo, pull_number: context.payload.pull_request.number,
+              });
+              prs = [data];
             }
 
             let hadError = false;
@@ -334,14 +361,21 @@ jobs:
 
             // Content-based visual signal (#3667). The classifier also proves
             // the narrower appearance-only exception for DESIGNOWNER authors.
-            // It and the diff both come from the API: trusted BASE-ref source,
-            // inert PR diff text. Any fetch or parse failure keeps the exception
-            // false, so Core runtime changes continue to require engineering.
+            // It and the diff both come from the API: trusted source, inert PR
+            // diff text. A default-branch base commit is reviewed code; a
+            // stacked PR's base is another PR's unmerged head, so its classifier
+            // comes from the trusted workflow SHA instead. Any fetch or parse
+            // failure keeps the exception false, so Core runtime changes
+            // continue to require engineering.
             let visualClassification = null;
             if (coreChange || designReasons.length === 0) {
               try {
+                const targetsDefaultBranch =
+                  typeof pr.base.ref === 'string' &&
+                  pr.base.ref === pr.base.repo?.default_branch;
+                const classifierRef = targetsDefaultBranch ? pr.base.sha : context.sha;
                 const { data: libFile } = await github.rest.repos.getContent({
-                  owner, repo, ref: pr.base.sha,
+                  owner, repo, ref: classifierRef,
                   path: '.github/scripts/lib/classify-visual.js',
                 });
                 const libSrc = Buffer.from(libFile.content, 'base64').toString('utf8');

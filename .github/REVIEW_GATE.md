@@ -155,6 +155,22 @@ internal contributors' PRs. Owners still self-serve their own domain.
      ⇒ blocks non-admin merges even for write-access internal contributors
 ```
 
+## Stacked pull requests
+
+Both gates also run for a pull request whose base is another pull request's
+branch, and each evaluates the diff against the pull request's current base.
+Changing the base re-runs both gates; title and body edits do not. Approval
+still counts only for the exact current head.
+
+`pull_request_target` always runs the default branch's workflow file, with
+`GITHUB_SHA` at the default branch tip, so a stacked base never chooses the
+workflow. The workflows also never execute helpers from a stacked base: the
+visual classifier and the review-clear decision helper load from the base
+commit only when the base is the default branch, and otherwise from the
+workflow commit. The spec gate enables auto-merge only for pull requests that
+target the default branch, and withdraws auto-merge it enabled when a pull
+request is retargeted elsewhere.
+
 ## Enforcement
 
 `review-required` is a **required status check** on `main`, plus the native

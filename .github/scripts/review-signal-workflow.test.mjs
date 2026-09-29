@@ -23,24 +23,51 @@ const script = parsed.jobs.flag.steps.find(
   step => step.name === 'Detect signals and route',
 ).with.script;
 const HELPER_PATH = '.github/scripts/review-signal-decision.cjs';
+const CLASSIFIER_PATH = '.github/scripts/lib/classify-visual.js';
 const WORKFLOW_SHA = '1'.repeat(40);
 const OLD_BASE = '2'.repeat(40);
 const HEAD = '3'.repeat(40);
+const LOWER_HEAD = '4'.repeat(40);
+const DEFAULT_BRANCH = 'main';
+const STACKED_BASE = 'feature/lower';
+// Stands in for a classifier someone pushed to another PR's branch. The gate
+// must never execute it.
+const UNTRUSTED_CLASSIFIER = [
+  'globalThis.__untrustedClassifierRan = true;',
+  'module.exports = {',
+  "  classifyVisualDiff: () => ({score: 0, bucket: 'none', appearanceOnly: true}),",
+  '};',
+].join('\n');
+
+const encode = source => Buffer.from(source).toString('base64');
 
 async function runSignal({
   eventName = 'workflow_dispatch',
+  action = 'synchronize',
+  changes,
+  author = 'contributor',
   baseSha = OLD_BASE,
+  baseRef = DEFAULT_BRANCH,
+  changedFiles = 1,
+  payloadPr,
   backfill = false,
   helperMissing = false,
   reviews = [],
 } = {}) {
+  delete globalThis.__untrustedClassifierRan;
   const pr = {
     number: 42,
-    user: {login: 'contributor', type: 'User'},
-    base: {sha: baseSha, ref: 'main'},
-    head: {sha: HEAD, ref: 'feature'},
-    changed_files: 1,
+    node_id: 'PR_node',
+    user: {login: author, type: 'User'},
+    base: {
+      sha: baseSha,
+      ref: baseRef,
+      repo: {full_name: 'facebook/astryx', default_branch: DEFAULT_BRANCH},
+    },
+    head: {sha: HEAD, ref: 'feature', repo: {full_name: 'facebook/astryx'}},
+    changed_files: changedFiles,
     labels: [{name: 'needs:code-review'}, {name: 'community'}],
+    auto_merge: null,
   };
   const mutations = {
     createCommitStatus: vi.fn(),
@@ -50,23 +77,27 @@ async function runSignal({
     updateCheck: vi.fn(),
     graphql: vi.fn(),
   };
+  const contentReads = [];
   const getContent = vi.fn(async ({path: filePath, ref}) => {
+    contentReads.push(`${ref}:${filePath}`);
     if (filePath === HELPER_PATH) {
       if (ref !== WORKFLOW_SHA || helperMissing) {
         throw Object.assign(new Error('Not Found'), {status: 404});
       }
-    } else if (
-      filePath !== '.github/scripts/lib/classify-visual.js' ||
-      ref !== baseSha
-    ) {
+    } else if (filePath === CLASSIFIER_PATH) {
+      if (ref === baseSha && baseRef !== DEFAULT_BRANCH) {
+        return {data: {type: 'file', content: encode(UNTRUSTED_CLASSIFIER)}};
+      }
+      if (ref !== baseSha && ref !== WORKFLOW_SHA) {
+        throw new Error(`Unexpected content read: ${ref}:${filePath}`);
+      }
+    } else {
       throw new Error(`Unexpected content read: ${ref}:${filePath}`);
     }
     return {
       data: {
         type: 'file',
-        content: Buffer.from(
-          fs.readFileSync(path.join(root, filePath)),
-        ).toString('base64'),
+        content: encode(fs.readFileSync(path.join(root, filePath))),
       },
     };
   });
@@ -113,7 +144,7 @@ async function runSignal({
       payload:
         eventName === 'workflow_dispatch'
           ? {inputs: {pr: backfill ? '' : '42'}}
-          : {pull_request: pr},
+          : {action, changes, pull_request: payloadPr ?? pr},
     },
     core,
     {
@@ -125,7 +156,16 @@ async function runSignal({
     },
     Buffer,
   );
-  return {github, core, mutations, getContent};
+  const untrustedClassifierRan = globalThis.__untrustedClassifierRan === true;
+  delete globalThis.__untrustedClassifierRan;
+  return {
+    github,
+    core,
+    mutations,
+    getContent,
+    contentReads,
+    untrustedClassifierRan,
+  };
 }
 
 function expectTrustedHelperRead(getContent) {
@@ -145,8 +185,8 @@ function expectTrustedHelperRead(getContent) {
 
 describe('review-signal trusted helper ref', () => {
   it('only runs the helper-loading job in trusted execution contexts', () => {
-    expect(parsed.jobs.flag.if.trim()).toBe(
-      "github.event_name == 'pull_request_target' || github.event_name == 'workflow_dispatch'",
+    expect(parsed.jobs.flag.if.replace(/\s+/g, ' ').trim()).toBe(
+      "(github.event_name == 'pull_request_target' && (github.event.action != 'edited' || github.event.changes.base != null)) || github.event_name == 'workflow_dispatch'",
     );
     expect(
       parsed.jobs.flag.steps.some(step =>
@@ -187,7 +227,12 @@ describe('review-signal trusted helper ref', () => {
           h.github.rest.pulls[options.backfill ? 'list' : 'get'],
         ).toHaveBeenCalledOnce();
       } else {
-        expect(h.github.rest.pulls.get).not.toHaveBeenCalled();
+        // PR events classify the live pull request, not the queued payload.
+        expect(h.github.rest.pulls.get).toHaveBeenCalledExactlyOnceWith({
+          owner: 'facebook',
+          repo: 'astryx',
+          pull_number: 42,
+        });
       }
     },
   );
@@ -255,7 +300,10 @@ describe('review-signal appearance-only contract', () => {
 
   it('loads the dependency-free classifier and trusted base/head source bytes', () => {
     expect(workflow).not.toContain('ref: pr.base.ref');
-    expect(workflow).toContain('ref: pr.base.sha');
+    expect(workflow).toContain(
+      'const classifierRef = targetsDefaultBranch ? pr.base.sha : context.sha',
+    );
+    expect(workflow).toContain('ref: classifierRef');
     expect(workflow).toContain(
       "path: '.github/scripts/lib/classify-visual.js'",
     );
@@ -331,5 +379,145 @@ describe('review-signal appearance-only contract', () => {
     expect(workflow).toContain(
       'Content-based visual classification failed closed',
     );
+  });
+});
+
+describe('review-signal on stacked pull requests', () => {
+  const classifierReads = h =>
+    h.contentReads.filter(read => read.endsWith(`:${CLASSIFIER_PATH}`));
+
+  it.each([
+    ['synchronize', {action: 'synchronize'}],
+    [
+      'base change',
+      {action: 'edited', changes: {base: {ref: {from: DEFAULT_BRANCH}}}},
+    ],
+  ])(
+    'flags a PR based on another PR branch on %s with trusted code only',
+    async (_name, event) => {
+      const h = await runSignal({
+        eventName: 'pull_request_target',
+        baseRef: STACKED_BASE,
+        baseSha: LOWER_HEAD,
+        ...event,
+      });
+
+      expectTrustedHelperRead(h.getContent);
+      expect(classifierReads(h)).toEqual([
+        `${WORKFLOW_SHA}:${CLASSIFIER_PATH}`,
+      ]);
+      expect(h.untrustedClassifierRan).toBe(false);
+      expect(h.core.setFailed).not.toHaveBeenCalled();
+      expect(h.core.warning).not.toHaveBeenCalled();
+      expect(h.mutations.createCommitStatus).toHaveBeenCalledExactlyOnceWith({
+        owner: 'facebook',
+        repo: 'astryx',
+        sha: HEAD,
+        context: 'review-required',
+        state: 'pending',
+        description: 'Waiting on code review: community contribution',
+      });
+    },
+  );
+
+  it('gives an engineering owner the same self-serve result as on main', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      author: 'engineer',
+      baseRef: STACKED_BASE,
+      baseSha: LOWER_HEAD,
+    });
+
+    expect(h.untrustedClassifierRan).toBe(false);
+    expect(h.mutations.createCommitStatus).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        sha: HEAD,
+        state: 'success',
+        description: 'No code review required.',
+      }),
+    );
+  });
+
+  it('keeps a main-based PR on its base-commit classifier', async () => {
+    const h = await runSignal({eventName: 'pull_request_target'});
+
+    expect(classifierReads(h)).toEqual([`${OLD_BASE}:${CLASSIFIER_PATH}`]);
+    expect(h.mutations.createCommitStatus).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({sha: HEAD, state: 'pending'}),
+    );
+  });
+
+  it.each([
+    [OLD_BASE, 'pending'],
+    [HEAD, 'success'],
+  ])(
+    'binds stacked approval to the exact current head (%s)',
+    async (reviewedSha, state) => {
+      const h = await runSignal({
+        eventName: 'pull_request_target',
+        baseRef: STACKED_BASE,
+        baseSha: LOWER_HEAD,
+        reviews: [
+          {
+            user: {login: 'engineer'},
+            state: 'APPROVED',
+            commit_id: reviewedSha,
+          },
+        ],
+      });
+
+      expect(h.mutations.createCommitStatus).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({sha: HEAD, state}),
+      );
+    },
+  );
+
+  it('classifies the live PR when a retarget lands after the event was queued', async () => {
+    // The event snapshot still targets main and counts the lower PR's files;
+    // by the time the job runs, the PR targets the lower branch.
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      baseRef: STACKED_BASE,
+      baseSha: LOWER_HEAD,
+      payloadPr: {
+        number: 42,
+        user: {login: 'contributor', type: 'User'},
+        base: {
+          sha: OLD_BASE,
+          ref: DEFAULT_BRANCH,
+          repo: {full_name: 'facebook/astryx', default_branch: DEFAULT_BRANCH},
+        },
+        head: {sha: HEAD, ref: 'feature', repo: {full_name: 'facebook/astryx'}},
+        changed_files: 19,
+        labels: [],
+        auto_merge: null,
+      },
+    });
+
+    expect(h.core.setFailed).not.toHaveBeenCalled();
+    expect(h.core.warning).not.toHaveBeenCalled();
+    expect(classifierReads(h)).toEqual([`${WORKFLOW_SHA}:${CLASSIFIER_PATH}`]);
+    expect(h.mutations.createCommitStatus).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({sha: HEAD, state: 'pending'}),
+    );
+  });
+
+  it('still fails closed when the live file list is incomplete', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      baseRef: STACKED_BASE,
+      baseSha: LOWER_HEAD,
+      changedFiles: 19,
+    });
+
+    expect(h.core.warning).toHaveBeenCalledWith(
+      'Failed to flag PR #42: GitHub returned 1 of 19 changed files; refusing to classify an incomplete PR.',
+    );
+    expect(h.core.setFailed).toHaveBeenCalledExactlyOnceWith(
+      'One or more PRs failed to flag; see warnings.',
+    );
+    for (const mutation of Object.values(h.mutations)) {
+      expect(mutation).not.toHaveBeenCalled();
+    }
   });
 });

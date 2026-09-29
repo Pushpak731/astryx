@@ -13,7 +13,7 @@
 # (read-only token → 403). It therefore runs on workflow_run after Review signal
 # anchors approved, changes_requested, and dismissed review events from the base
 # repository with a write-capable token. It never checks out or runs
-# PR-controlled code.
+# PR-controlled code; a stacked PR's unmerged base is PR-controlled.
 
 name: Review clear
 
@@ -120,8 +120,16 @@ jobs:
               const reviews = await github.paginate(github.rest.pulls.listReviews, {
                 owner, repo, pull_number: prNumber, per_page: 100,
               });
+              // A default-branch base commit is reviewed code. A stacked PR's
+              // base is another PR's unmerged head, so load the helper from
+              // this run's trusted default-branch SHA instead of executing it.
+              const helperRef =
+                typeof full.base.ref === 'string' &&
+                full.base.ref === full.base.repo?.default_branch
+                  ? full.base.sha
+                  : context.sha;
               const { data: decisionFile } = await github.rest.repos.getContent({
-                owner, repo, ref: full.base.sha,
+                owner, repo, ref: helperRef,
                 path: '.github/scripts/review-signal-decision.cjs',
               });
               const decisionSrc = Buffer.from(decisionFile.content, 'base64').toString('utf8');

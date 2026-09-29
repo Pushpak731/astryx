@@ -220,9 +220,10 @@ async function reconcileSpecOwnerGate({
     return newest === null || newest.runId <= runId;
   }
 
-  async function currentPullForRun(headSha) {
+  async function currentPullForRun(headSha, baseRef) {
     const current = await getPullRequest();
     if (current.head.sha !== headSha) return null;
+    if (current.base.ref !== baseRef) return null;
     if (isSettled(current)) return null;
     if (!(await isCurrentRun(headSha))) return null;
     return current;
@@ -329,6 +330,7 @@ async function reconcileSpecOwnerGate({
   async function fetchSnapshot() {
     const before = await getPullRequest();
     const headSha = before.head.sha;
+    const baseRef = before.base.ref;
     const [files, reviews, comments, timeline, statuses] = await Promise.all([
       github.paginate(github.rest.pulls.listFiles, {
         owner,
@@ -357,7 +359,9 @@ async function reconcileSpecOwnerGate({
       listStatuses(headSha),
     ]);
     const after = await getPullRequest();
-    if (after.head.sha !== headSha) return null;
+    // A retarget changes the file list without moving the head. Its own
+    // base-change event reconciles the new base; never mix the two.
+    if (after.head.sha !== headSha || after.base.ref !== baseRef) return null;
 
     const scope = classifyChanges(files, {expectedCount: after.changed_files});
     const knowledgeChanges = files.filter(
@@ -396,7 +400,7 @@ async function reconcileSpecOwnerGate({
       }),
     );
     const latest = await getPullRequest();
-    if (latest.head.sha !== headSha) return null;
+    if (latest.head.sha !== headSha || latest.base.ref !== baseRef) return null;
     return {
       pr: latest,
       files,
@@ -473,7 +477,7 @@ async function reconcileSpecOwnerGate({
   const snapshot = await fetchSnapshot();
   if (snapshot === null || snapshot.pr.head.sha !== initialHead) {
     core.info(
-      'The pull request head changed while this run was reading state.',
+      'The pull request head or base changed while this run was reading state.',
     );
     return;
   }
@@ -646,9 +650,24 @@ async function reconcileSpecOwnerGate({
     return;
   }
 
+  // Auto-merge lands a stacked pull request into another pull request's
+  // branch, where the default branch's required checks may not apply. The
+  // gate only automates landing on the default branch, and withdraws its own
+  // auto-merge from a pull request retargeted elsewhere.
+  if (
+    typeof pr.base.ref !== 'string' ||
+    pr.base.ref !== pr.base.repo?.default_branch
+  ) {
+    await disableAutoMerge(pr);
+    core.info(
+      'Stacked pull request: published the gate status without auto-merge.',
+    );
+    return;
+  }
+
   let enabledAutoMergeByThisRun = false;
   if (!pr.auto_merge) {
-    const beforeEnable = await currentPullForRun(initialHead);
+    const beforeEnable = await currentPullForRun(initialHead, pr.base.ref);
     if (beforeEnable === null || beforeEnable.auto_merge) return;
     await ensureLabel(
       beforeEnable,
@@ -656,7 +675,7 @@ async function reconcileSpecOwnerGate({
       'bfdadc',
       'Auto-merge was enabled by the spec owner gate',
     );
-    const afterLabel = await currentPullForRun(initialHead);
+    const afterLabel = await currentPullForRun(initialHead, pr.base.ref);
     if (afterLabel === null || afterLabel.auto_merge) return;
     try {
       await github.graphql(

@@ -29,6 +29,15 @@ const execute = new Function(
 const head1 = '1111111111111111111111111111111111111111';
 const head2 = '2222222222222222222222222222222222222222';
 const head3 = '3333333333333333333333333333333333333333';
+const baseSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+const workflowSha = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+// Stands in for a helper pushed to another PR's branch; it would clear any gate.
+const untrustedHelper = [
+  'globalThis.__untrustedHelperRan = true;',
+  'module.exports = {',
+  '  resolveReviewApprovals: () => ({codeApproved: true, codeWithdrawn: false}),',
+  '};',
+].join('\n');
 const review = (state, commitId = head2) => ({
   user: {login: 'engineer'},
   state,
@@ -50,6 +59,7 @@ const ungatedSuccess = gateStatus('success', 'No code review required.');
 function harness(
   reviews,
   {
+    baseRef = 'main',
     labels = ['needs:code-review'],
     moveAfterFirstRead = false,
     statusFailure = false,
@@ -61,7 +71,7 @@ function harness(
   const full = {
     number: 17,
     head: {sha: head2},
-    base: {sha: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'},
+    base: {sha: baseSha, ref: baseRef, repo: {default_branch: 'main'}},
     labels: labels.map(name => ({name})),
   };
   const methods = {
@@ -87,10 +97,14 @@ function harness(
       repos: {
         getContent: async ({ref, path: filePath}) => {
           calls.push(`read:${ref}:${filePath}`);
+          const source =
+            baseRef !== 'main' && ref === baseSha
+              ? untrustedHelper
+              : helperSource;
           return {
             data: {
               type: 'file',
-              content: Buffer.from(helperSource).toString('base64'),
+              content: Buffer.from(source).toString('base64'),
             },
           };
         },
@@ -113,6 +127,7 @@ function harness(
   };
   const context = {
     repo: {owner: 'facebook', repo: 'astryx'},
+    sha: workflowSha,
     payload: {
       workflow_run: {
         pull_requests: [{number: 17}],
@@ -128,7 +143,13 @@ function harness(
 }
 
 async function run(h) {
-  await execute(h.github, h.context, h.core, h.processValue, Buffer);
+  delete globalThis.__untrustedHelperRan;
+  try {
+    await execute(h.github, h.context, h.core, h.processValue, Buffer);
+  } finally {
+    h.untrustedHelperRan = globalThis.__untrustedHelperRan === true;
+    delete globalThis.__untrustedHelperRan;
+  }
 }
 
 function mutations(calls) {
@@ -145,7 +166,7 @@ describe('review-clear exact-head workflow', () => {
 
     expect(mutations(h.calls)).toEqual([]);
     expect(h.calls).toContain(
-      'read:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:.github/scripts/review-signal-decision.cjs',
+      `read:${baseSha}:.github/scripts/review-signal-decision.cjs`,
     );
   });
 
@@ -295,4 +316,39 @@ describe('review-clear exact-head workflow', () => {
       expect(mutations(h.calls)).toEqual([]);
     },
   );
+
+  describe('on a PR based on another PR branch', () => {
+    it('loads the decision helper from the trusted workflow SHA', async () => {
+      const h = harness([review('APPROVED', head1)], {
+        baseRef: 'feature/lower',
+      });
+
+      await run(h);
+
+      expect(h.untrustedHelperRan).toBe(false);
+      expect(h.calls).toContain(
+        `read:${workflowSha}:.github/scripts/review-signal-decision.cjs`,
+      );
+      expect(h.calls).not.toContain(
+        `read:${baseSha}:.github/scripts/review-signal-decision.cjs`,
+      );
+      expect(mutations(h.calls)).toEqual([]);
+    });
+
+    it('clears an owned stacked gate only for exact-head approval', async () => {
+      const h = harness([review('APPROVED')], {baseRef: 'feature/lower'});
+
+      await run(h);
+
+      expect(h.untrustedHelperRan).toBe(false);
+      expect(h.calls).toContainEqual({
+        type: 'status',
+        input: expect.objectContaining({
+          sha: head2,
+          state: 'success',
+          description: 'Cleared by code-owner approval.',
+        }),
+      });
+    });
+  });
 });
