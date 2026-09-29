@@ -68,9 +68,14 @@ import {useMergedRefs} from '../hooks/useMergedRefs';
 // Styles
 // =============================================================================
 
-const TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER = spacingVars['--spacing-3'];
-const TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE = `calc(100vb - max(${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER}, env(safe-area-inset-top, 0px)) - max(${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER}, env(safe-area-inset-bottom, 0px)))`;
-const TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE_FALLBACK = `calc(100vh - ${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER} - ${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER})`;
+const TOP_NAV_MEGA_MENU_BLOCK_GUTTER = spacingVars['--spacing-3'];
+const TOP_NAV_MEGA_MENU_INLINE_GUTTER = spacingVars['--spacing-4'];
+const TOP_NAV_MEGA_MENU_SAFE_BLOCK_GUTTER = `max(${TOP_NAV_MEGA_MENU_BLOCK_GUTTER}, env(safe-area-inset-top, 0px), env(safe-area-inset-right, 0px), env(safe-area-inset-bottom, 0px), env(safe-area-inset-left, 0px))`;
+const TOP_NAV_MEGA_MENU_SAFE_INLINE_GUTTER = `max(${TOP_NAV_MEGA_MENU_INLINE_GUTTER}, env(safe-area-inset-top, 0px), env(safe-area-inset-right, 0px), env(safe-area-inset-bottom, 0px), env(safe-area-inset-left, 0px))`;
+const TOP_NAV_MEGA_MENU_POSITION_AREA_MAX_BLOCK_SIZE = `calc(100% - ${TOP_NAV_MEGA_MENU_SAFE_BLOCK_GUTTER} - ${TOP_NAV_MEGA_MENU_SAFE_BLOCK_GUTTER})`;
+const TOP_NAV_MEGA_MENU_POSITION_AREA_MAX_BLOCK_SIZE_FALLBACK = `calc(100% - ${TOP_NAV_MEGA_MENU_BLOCK_GUTTER} - ${TOP_NAV_MEGA_MENU_BLOCK_GUTTER})`;
+const TOP_NAV_MEGA_MENU_SAFE_MAX_INLINE_SIZE = `min(960px, calc(100dvi - ${TOP_NAV_MEGA_MENU_SAFE_INLINE_GUTTER} - ${TOP_NAV_MEGA_MENU_SAFE_INLINE_GUTTER}))`;
+const TOP_NAV_MEGA_MENU_SAFE_MAX_INLINE_SIZE_FALLBACK = `min(960px, calc(100vw - ${TOP_NAV_MEGA_MENU_INLINE_GUTTER} - ${TOP_NAV_MEGA_MENU_INLINE_GUTTER}))`;
 
 const styles = stylex.create({
   trigger: {
@@ -142,11 +147,9 @@ const styles = stylex.create({
       transform: 'translateY(-4px)',
     },
   },
-  // Preserve the requested block size while the panel can fit above or below
-  // the nav, then clamp to the safe viewport only when no candidate can fit.
-  // The layer is a flex column so panelContainer can shrink and scroll its
-  // own content, keeping the surface radius/shadow static at the edges.
-  // Internal scroll is a stopgap until the mobile bottom-sheet lands.
+  // Order candidates by available block-axis room before applying the
+  // candidate-relative cap. Natural size is preserved whenever the winning
+  // candidate fits; otherwise the layer scrolls within that roomier side.
   panelViewportFit: {
     display: {
       default: 'none',
@@ -154,9 +157,18 @@ const styles = stylex.create({
     },
     flexDirection: 'column',
     maxBlockSize: stylex.firstThatWorks(
-      TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE,
-      TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE_FALLBACK,
+      TOP_NAV_MEGA_MENU_POSITION_AREA_MAX_BLOCK_SIZE,
+      TOP_NAV_MEGA_MENU_POSITION_AREA_MAX_BLOCK_SIZE_FALLBACK,
     ),
+    maxInlineSize: stylex.firstThatWorks(
+      TOP_NAV_MEGA_MENU_SAFE_MAX_INLINE_SIZE,
+      TOP_NAV_MEGA_MENU_SAFE_MAX_INLINE_SIZE_FALLBACK,
+    ),
+    marginInline: TOP_NAV_MEGA_MENU_SAFE_INLINE_GUTTER,
+    // The size cap belongs to this element, so it also owns overflow. Scrolling
+    // a descendant would leave that child at its natural block size and clip it.
+    overflow: 'auto',
+    overscrollBehavior: 'contain',
   },
   // Visual styles for the panel content container.
   panelContainer: {
@@ -167,11 +179,10 @@ const styles = stylex.create({
     borderRadius: radiusVars['--radius-container'],
     boxShadow: shadowVars['--shadow-low'],
     overflow: 'hidden',
-    // Allow the container to shrink inside the height-clamped layer so its
-    // content (panelContent) can scroll rather than overflow the viewport.
+    // Allow the container to shrink inside the block-size-clamped layer.
     display: 'flex',
     flexDirection: 'column',
-    minHeight: 0,
+    minBlockSize: 0,
   },
   panelContent: {
     display: 'flex',
@@ -179,14 +190,9 @@ const styles = stylex.create({
     gap: spacingVars['--spacing-6'],
     paddingBlock: spacingVars['--spacing-3'],
     paddingInline: spacingVars['--spacing-3'],
-    // Clamp to the viewport (minus a gutter) so the anchored panel never
-    // overflows the screen edge on narrow viewports; caps at 960px otherwise.
-    maxWidth: `min(960px, calc(100dvw - ${spacingVars['--spacing-4']}))`,
+    // Clamp the layer's logical inline size; this content then fills it.
+    inlineSize: '100%',
     boxSizing: 'border-box',
-    // Scroll internally when the menu is taller than the available space
-    // below the nav (paired with panelViewportFit on the layer).
-    overflowY: 'auto',
-    overscrollBehavior: 'contain',
   },
   menuWrapper: {
     flexGrow: 2,
@@ -539,6 +545,7 @@ function DefaultMegaMenu({
               'below',
               slot,
             ),
+            positionTryOrder: 'most-block-size',
           },
           xstyle: [styles.panelAnimation, styles.panelViewportFit],
         },

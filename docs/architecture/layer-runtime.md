@@ -129,24 +129,23 @@ and expose its overflow through the component's scrolling contract.
 
 Layer also provides package-internal named full-axis tries with physical safe-area
 margins for viewport-constrained owners. Opting into those tries changes only the
-last fallback geometry: it does not assign width, maximum size, or scrolling to
-Layer. DropdownMenu, Popover, BaseTypeahead, and PowerSearch remain the current
-sizing owners that combine those tries with their own safe-viewport constraints:
-DropdownMenu, Popover, BaseTypeahead, PowerSearch, and TopNavMegaMenu. Direct `usePopover`/`useLayer` consumers without a candidate-relative size cap,
-including Selector-family surfaces, HoverCard, Tooltip, and keyboard hints, keep
-the standard fallback list and their existing component-owned or intrinsic size.
+fallback geometry: it does not assign width, maximum size, or scrolling to Layer.
+Each sizing owner combines them with its own safe-viewport constraint. Direct
+`usePopover`/`useLayer` consumers without a candidate-relative size cap, including
+Selector-family surfaces, HoverCard, Tooltip, and keyboard hints, keep the standard
+fallback list and their existing component-owned or intrinsic size.
 
 ### Anchored sizing-owner ledger
 
-| Runtime path                                                 | Sizing owner              | Preserve-before-contain responsibility                                                                                                                            |
-| ------------------------------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| DropdownMenu root popover                                    | DropdownMenu              | Preserve `menuWidth` or intrinsic width while a safe candidate fits; own menu scrolling and viewport caps.                                                        |
-| Popover component                                            | Popover                   | Preserve explicit width or trigger-matched minimum width through ordered fallbacks; own measured overflow and scrolling.                                          |
-| BaseTypeahead, including Typeahead and Tokenizer composition | BaseTypeahead             | Preserve intrinsic or numeric result width through ordered fallbacks; own result-list scrolling.                                                                  |
-| PowerSearch editor                                           | PowerSearch               | Preserve its 400 px editor floor through ordered fallbacks; yield only when the safe viewport cannot contain it.                                                  |
-| TopNavMegaMenu                                               | TopNavMegaMenu            | Preserve requested block size through below, above, and full-axis fallbacks; own panel scrolling and the safe-viewport block cap.                                 |
-| Selector, MultiSelector, and ComplexSelector popovers        | Selector-family component | Match the trigger minimum without a candidate-relative cap; inherit Layer fallback order without a separate sizing change. Bottom-sheet presentation is separate. |
-| HoverCard, Tooltip, and keyboard hints                       | Owning surface/content    | Keep intrinsic or component-capped content on the ordinary Layer path; no candidate-relative clamp participates.                                                  |
+| Runtime path                                                 | Sizing owner              | Preserve-before-contain responsibility                                                                                                                                                          |
+| ------------------------------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DropdownMenu root popover                                    | DropdownMenu              | Preserve `menuWidth` or intrinsic width while a safe candidate fits; own menu scrolling and viewport caps.                                                                                      |
+| Popover component                                            | Popover                   | Preserve explicit width or trigger-matched minimum width through ordered fallbacks; own measured overflow and scrolling.                                                                        |
+| BaseTypeahead, including Typeahead and Tokenizer composition | BaseTypeahead             | Preserve intrinsic or numeric result width through ordered fallbacks; own result-list scrolling.                                                                                                |
+| PowerSearch editor                                           | PowerSearch               | Preserve its 400 px editor floor through ordered fallbacks; yield only when the safe viewport cannot contain it.                                                                                |
+| TopNavMegaMenu                                               | TopNavMegaMenu            | Preserve requested block size when either side fits. If neither fits, order candidates by available block size, constrain to the roomier side, and scroll internally on the logical block axis. |
+| Selector, MultiSelector, and ComplexSelector popovers        | Selector-family component | Match the trigger minimum without a candidate-relative cap; inherit Layer fallback order without a separate sizing change. Bottom-sheet presentation is separate.                               |
+| HoverCard, Tooltip, and keyboard hints                       | Owning surface/content    | Keep intrinsic or component-capped content on the ordinary Layer path; no candidate-relative clamp participates.                                                                                |
 
 The same behavior reaches composed callers without another sizing owner:
 Table filtering, ChatEmojiPicker, and TourStep inherit Popover; MoreMenu and

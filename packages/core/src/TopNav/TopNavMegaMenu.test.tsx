@@ -19,15 +19,20 @@ import {TopNavMegaMenuItem} from './TopNavMegaMenuItem';
 import {TopNavRenderContext} from './TopNavRenderContext';
 import {spacingVars} from '../theme/tokens.stylex';
 
-const TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER = spacingVars['--spacing-3'];
-const TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE = `calc(100vb - max(${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER}, env(safe-area-inset-top, 0px)) - max(${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER}, env(safe-area-inset-bottom, 0px)))`;
-const TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE_FALLBACK = `calc(100vh - ${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER} - ${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER})`;
+const TOP_NAV_MEGA_MENU_BLOCK_GUTTER = spacingVars['--spacing-3'];
+const TOP_NAV_MEGA_MENU_SAFE_BLOCK_GUTTER = `max(${TOP_NAV_MEGA_MENU_BLOCK_GUTTER}, env(safe-area-inset-top, 0px), env(safe-area-inset-right, 0px), env(safe-area-inset-bottom, 0px), env(safe-area-inset-left, 0px))`;
+const TOP_NAV_MEGA_MENU_POSITION_AREA_MAX_BLOCK_SIZE = `calc(100% - ${TOP_NAV_MEGA_MENU_SAFE_BLOCK_GUTTER} - ${TOP_NAV_MEGA_MENU_SAFE_BLOCK_GUTTER})`;
+const TOP_NAV_MEGA_MENU_POSITION_AREA_MAX_BLOCK_SIZE_FALLBACK = `calc(100% - ${TOP_NAV_MEGA_MENU_BLOCK_GUTTER} - ${TOP_NAV_MEGA_MENU_BLOCK_GUTTER})`;
 const layerProbe = stylex.create({
-  viewportFit: {
+  roomierCandidateFit: {
     maxBlockSize: stylex.firstThatWorks(
-      TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE,
-      TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE_FALLBACK,
+      TOP_NAV_MEGA_MENU_POSITION_AREA_MAX_BLOCK_SIZE,
+      TOP_NAV_MEGA_MENU_POSITION_AREA_MAX_BLOCK_SIZE_FALLBACK,
     ),
+  },
+  blockScroll: {
+    overflow: 'auto',
+    overscrollBehavior: 'contain',
   },
 });
 
@@ -98,7 +103,7 @@ describe('TopNavMegaMenu — default mode', () => {
     expect(screen.getByRole('button', {name: 'Products'})).toBeInTheDocument();
   });
 
-  it('preserves panel height through guttered fallbacks before viewport clamping', () => {
+  it('orders block fallbacks by available room before candidate containment', () => {
     render(
       <TopNavMegaMenu
         label="Products"
@@ -106,15 +111,30 @@ describe('TopNavMegaMenu — default mode', () => {
       />,
     );
 
-    const layer = screen
-      .getByRole('group', {name: 'Products', hidden: true})
-      .closest('[popover]') as HTMLElement;
+    const group = screen.getByRole('group', {
+      name: 'Products',
+      hidden: true,
+    });
+    const layer = group.closest('[popover]') as HTMLElement;
     expect(layer).not.toBeNull();
     expect(layer.style.positionTryFallbacks).toContain(
       '--astryx-layer-block-end-guttered-full-axis',
     );
-    const {className = ''} = stylex.props(layerProbe.viewportFit);
-    for (const atomicClass of className
+    expect(layer.style.positionTryOrder).toBe('most-block-size');
+
+    const {className: fitClassName = ''} = stylex.props(
+      layerProbe.roomierCandidateFit,
+    );
+    for (const atomicClass of fitClassName
+      .split(' ')
+      .filter(name => name !== '' && !name.includes('__'))) {
+      expect(layer).toHaveClass(atomicClass);
+    }
+
+    const {className: scrollClassName = ''} = stylex.props(
+      layerProbe.blockScroll,
+    );
+    for (const atomicClass of scrollClassName
       .split(' ')
       .filter(name => name !== '' && !name.includes('__'))) {
       expect(layer).toHaveClass(atomicClass);

@@ -109,7 +109,21 @@ const TARGETS = [
     story: 'core-topnavmenu--mega-menu-position-fallback-before-sizing',
     viewport: {width: 800, height: 600},
     guards:
-      'a tall panel flips above before enabling viewport-height containment',
+      'an oversize desktop panel chooses the roomier side, constrains, and scrolls internally',
+  },
+  {
+    component: 'TopNavMegaMenu',
+    story: 'core-topnavmenu--mega-menu-oversize-mobile-rtl',
+    viewport: {width: 390, height: 600},
+    guards:
+      'an oversize RTL mobile-width panel chooses the roomier side and keeps every link scrollable',
+  },
+  {
+    component: 'TopNavMegaMenu',
+    story: 'core-topnavmenu--mega-menu-oversize-vertical-writing',
+    viewport: {width: 600, height: 500},
+    guards:
+      'vertical writing uses logical block containment and scrolling within viewport bounds',
   },
   {
     component: 'Selector',
