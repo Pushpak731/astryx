@@ -7,7 +7,6 @@ import {Button} from '@astryxdesign/core/Button';
 import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
 import {Divider} from '@astryxdesign/core/Divider';
 import {Heading} from '@astryxdesign/core/Heading';
-import {List, ListItem} from '@astryxdesign/core/List';
 import {Section} from '@astryxdesign/core/Section';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Text} from '@astryxdesign/core/Text';
@@ -44,12 +43,15 @@ interface NotificationOverviewSheetProps {
   height: NotificationSheetHeight;
   onCancel: () => void;
   onContinue: () => void;
+  /** Pushes a stacked help sheet above this step (activeSheets flows). */
+  onHelp?: () => void;
 }
 
 function NotificationOverviewSheet({
   height,
   onCancel,
   onContinue,
+  onHelp,
 }: NotificationOverviewSheetProps) {
   return (
     <BottomSheet
@@ -89,6 +91,13 @@ function NotificationOverviewSheet({
               </Text>
             </VStack>
           </VStack>
+          {onHelp != null && (
+            <Button
+              label="How do notifications work?"
+              variant="secondary"
+              onClick={onHelp}
+            />
+          )}
           <HStack gap={2} hAlign="end">
             <Button label="Cancel" variant="secondary" onClick={onCancel} />
             <Button label="Continue" onClick={onContinue} />
@@ -249,136 +258,73 @@ const openFlow: NonNullable<Story['play']> = async ({canvasElement}) => {
   }
 };
 
-interface DrillInIssue {
-  id: string;
-  title: string;
-  summary: string;
-}
-
-const DRILL_IN_ISSUES: ReadonlyArray<DrillInIssue> = [
-  {
-    id: 'login-timeout',
-    title: 'Sign-in times out on slow networks',
-    summary: 'Reported 2 hours ago · 14 people affected',
-  },
-  {
-    id: 'sync-conflict',
-    title: 'Offline edits overwrite newer changes',
-    summary: 'Reported yesterday · 6 people affected',
-  },
-  {
-    id: 'export-encoding',
-    title: 'CSV export garbles accented names',
-    summary: 'Reported 3 days ago · 2 people affected',
-  },
-];
-
 /**
- * Drill-in stack on the ordered `activeSheets` path. The story starts on a
- * deep initial path so the covered list sheet is immediately visible receding
- * behind the details sheet; picking another level pushes and Back pops.
+ * The unified flow on the ordered `activeSheets` path: the same three setup
+ * steps as the singular flow (each step replaces the last), plus a stacked
+ * help sheet pushed above step 1 — the covered step stays mounted and recedes
+ * behind it, and Back pops one level.
  */
-function DrillInStackExample({
+function MultiStepPathExample({
   initialSheets,
 }: {
   initialSheets: ReadonlyArray<string>;
 }) {
   const [activeSheets, setActiveSheets] =
     useState<ReadonlyArray<string>>(initialSheets);
-  const [selectedIssueId, setSelectedIssueId] = useState(DRILL_IN_ISSUES[0].id);
-  const issue =
-    DRILL_IN_ISSUES.find(candidate => candidate.id === selectedIssueId) ??
-    DRILL_IN_ISSUES[0];
-  const popSheet = () => setActiveSheets(current => current.slice(0, -1));
 
   return (
     <>
       <Button
-        label="Browse open issues"
-        onClick={() => setActiveSheets(['issues'])}
+        label="Set up notifications"
+        onClick={() => setActiveSheets(['overview'])}
       />
       <BottomSheetSwitcher
         activeSheets={activeSheets}
         onActiveSheetsChange={setActiveSheets}>
-        <BottomSheet sheetId="issues" label="Open issues" height="hug">
-          <Section padding={4}>
-            <VStack gap={3}>
-              <Heading level={3}>Open issues</Heading>
-              <List hasDividers>
-                {DRILL_IN_ISSUES.map(candidate => (
-                  <ListItem
-                    key={candidate.id}
-                    label={candidate.title}
-                    description={candidate.summary}
-                    onClick={() => {
-                      setSelectedIssueId(candidate.id);
-                      setActiveSheets(['issues', 'issue-details']);
-                    }}
-                  />
-                ))}
-              </List>
-            </VStack>
-          </Section>
-        </BottomSheet>
-        <BottomSheet sheetId="issue-details" label="Issue details" height="hug">
+        <NotificationOverviewSheet
+          height="hug"
+          onCancel={() => setActiveSheets([])}
+          onContinue={() => setActiveSheets(['frequency'])}
+          onHelp={() => setActiveSheets(['overview', 'help'])}
+        />
+        <BottomSheet sheetId="help" label="How notifications work" height="hug">
           <Section padding={4}>
             <VStack gap={4}>
-              <VStack gap={1}>
-                <Heading level={3}>{issue.title}</Heading>
-                <Text type="supporting" color="secondary">
-                  {issue.summary}
-                </Text>
-              </VStack>
+              <Heading level={3}>How notifications work</Heading>
               <Text type="body">
-                The covered list sheet stays mounted and inert, receding behind
-                this sheet. Back pops one level and restores it.
+                This sheet is stacked on the ordered path: the first step stays
+                mounted and recedes behind it. Back pops one level and returns
+                focus to the step below.
               </Text>
               <HStack gap={2} hAlign="end">
-                <Button label="Back" variant="secondary" onClick={popSheet} />
                 <Button
-                  label="View activity"
+                  label="Back"
                   onClick={() =>
-                    setActiveSheets(['issues', 'issue-details', 'activity'])
+                    setActiveSheets(current => current.slice(0, -1))
                   }
                 />
               </HStack>
             </VStack>
           </Section>
         </BottomSheet>
-        <BottomSheet sheetId="activity" label="Recent activity" height="hug">
-          <Section padding={4}>
-            <VStack gap={4}>
-              <Heading level={3}>Recent activity</Heading>
-              <Text type="body">
-                Two covered levels now recede behind this sheet; only the
-                nearest levels stay visually distinct.
-              </Text>
-              <HStack gap={2} hAlign="end">
-                <Button label="Back" variant="secondary" onClick={popSheet} />
-                <Button label="Close all" onClick={() => setActiveSheets([])} />
-              </HStack>
-            </VStack>
-          </Section>
-        </BottomSheet>
+        <NotificationFrequencySheet
+          height="hug"
+          onBack={() => setActiveSheets(['overview'])}
+          onContinue={() => setActiveSheets(['channels'])}
+        />
+        <NotificationChannelsSheet
+          height="hug"
+          onBack={() => setActiveSheets(['frequency'])}
+          onFinish={() => setActiveSheets([])}
+        />
       </BottomSheetSwitcher>
     </>
   );
 }
 
-export const DrillIn: Story = {
-  name: 'Drill-in Stack (activeSheets)',
-  render: () => (
-    <DrillInStackExample initialSheets={['issues', 'issue-details']} />
-  ),
-};
-
-export const DrillInDeep: Story = {
-  name: 'Drill-in Stack (activeSheets) — three levels',
-  render: () => (
-    <DrillInStackExample
-      initialSheets={['issues', 'issue-details', 'activity']}
-    />
-  ),
+export const MultiStepStackedHelp: Story = {
+  name: 'Multi-step + Stacked Help (activeSheets)',
+  render: () => <MultiStepPathExample initialSheets={['overview', 'help']} />,
 };
 
 export const HugContent: Story = {

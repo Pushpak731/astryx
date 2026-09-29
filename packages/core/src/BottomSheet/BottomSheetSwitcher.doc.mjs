@@ -41,7 +41,7 @@ export const docs = {
     overlay: true,
     overlayControl: {
       stateProp: 'activeSheets',
-      openValue: ['details', 'preferences'],
+      openValue: ['details', 'details-help'],
     },
     defaults: {
       activeSheets: [],
@@ -74,6 +74,43 @@ export const docs = {
                   __element: 'Text',
                   props: {type: 'supporting'},
                   children: 'You can review these details before saving.',
+                },
+              ],
+            },
+          },
+        },
+        {
+          __element: 'BottomSheet',
+          props: {
+            sheetId: 'details-help',
+            label: 'About setup details',
+            height: 'hug',
+          },
+          children: {
+            __element: 'Section',
+            props: {padding: 4},
+            children: {
+              __element: 'VStack',
+              props: {gap: 2},
+              children: [
+                {
+                  __element: 'Heading',
+                  props: {level: 3},
+                  children: 'About setup details',
+                },
+                {
+                  __element: 'Text',
+                  props: {type: 'body'},
+                  children:
+                    'This help sheet is stacked on the ordered path; the ' +
+                    'covered step stays mounted and recedes behind it.',
+                },
+                {
+                  __element: 'Text',
+                  props: {type: 'supporting'},
+                  children:
+                    'Escape or the scrim pops one level back to the step ' +
+                    'below.',
                 },
               ],
             },
@@ -236,34 +273,46 @@ export const docs = {
   },
   examples: [
     {
-      label: 'Drill-in stack with the ordered path',
+      label: 'Multi-step flow with a stacked help sheet',
       code: `const [activeSheets, setActiveSheets] = useState([]);
 
 <>
-  <Button label="Browse issues" onClick={() => setActiveSheets(['issues'])} />
+  <Button label="Start" onClick={() => setActiveSheets(['details'])} />
   <BottomSheetSwitcher
     activeSheets={activeSheets}
     onActiveSheetsChange={setActiveSheets}>
-    <BottomSheet sheetId="issues" label="Issues" height="hug">
-      <IssueList
-        onSelectIssue={issueId =>
-          setActiveSheets(['issues', 'issue-details'])
-        }
+    <BottomSheet sheetId="details" label="Details" height="hug">
+      <SetupDetails />
+      <Button
+        label="What are these details?"
+        variant="secondary"
+        onClick={() => setActiveSheets(['details', 'details-help'])}
       />
+      <Button label="Continue" onClick={() => setActiveSheets(['preferences'])} />
     </BottomSheet>
-    <BottomSheet sheetId="issue-details" label="Issue details" height="hug">
-      <IssueDetails />
+    <BottomSheet sheetId="details-help" label="About these details" height="hug">
+      {/* Stacked above Details, which stays visible and receded behind it. */}
+      <DetailsHelp />
       <Button
         label="Back"
         onClick={() => setActiveSheets(current => current.slice(0, -1))}
       />
-      <Button label="Close all" onClick={() => setActiveSheets([])} />
+    </BottomSheet>
+    <BottomSheet sheetId="preferences" label="Preferences" height="hug">
+      <Preferences />
+      <Button label="Back" onClick={() => setActiveSheets(['details'])} />
+      <Button label="Continue" onClick={() => setActiveSheets(['confirm'])} />
+    </BottomSheet>
+    <BottomSheet sheetId="confirm" label="Confirm" height="hug">
+      <Confirmation />
+      <Button label="Back" onClick={() => setActiveSheets(['preferences'])} />
+      <Button label="Done" onClick={() => setActiveSheets([])} />
     </BottomSheet>
   </BottomSheetSwitcher>
 </>`,
     },
     {
-      label: 'Three-step flow (singular form)',
+      label: 'Three-step flow (released singular form)',
       code: `const [activeSheet, setActiveSheet] = useState(null);
 
 <>
