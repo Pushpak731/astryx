@@ -13,6 +13,7 @@ const {
   gateScope,
   governedSiblings,
   resolveReviewApprovals,
+  sameFileList,
   samePullIdentity,
 } = require('./review-signal-decision.cjs');
 
@@ -256,26 +257,63 @@ describe('gate scope for shared commit statuses', () => {
     ).toEqual([9, 12]);
   });
 
-  it('matches a diff to the listed files by count and unquoted path', () => {
+  it('matches a diff to the listed files by header, renames and deletions included', () => {
     const files = [
       {filename: 'a.md'},
       {filename: 'b/new.ts', previous_filename: 'b/old.ts'},
+      {filename: 'with space.md'},
     ];
-    const diff =
-      'diff --git a/a.md b/a.md\n+x\ndiff --git a/b/old.ts b/b/new.ts\n';
+    const diff = [
+      'diff --git a/a.md b/a.md',
+      '+x',
+      'diff --git a/b/old.ts b/b/new.ts',
+      'diff --git a/with space.md b/with space.md',
+      'deleted file mode 100644',
+      '',
+    ].join('\n');
     expect(diffMatchesFiles(diff, files)).toBe(true);
+    // Too few headers, or an equal count naming another file.
     expect(diffMatchesFiles('diff --git a/a.md b/a.md\n', files)).toBe(false);
     expect(
-      diffMatchesFiles(
-        'diff --git a/a.md b/a.md\ndiff --git a/c.ts b/c.ts\n',
-        files,
-      ),
-    ).toBe(false);
-    // Git quotes unusual paths; those count but are not compared by name.
-    expect(
-      diffMatchesFiles('diff --git "a/\\303\\251" "b/\\303\\251"\n', [
-        {filename: '\u00e9'},
+      diffMatchesFiles('diff --git a/README.md b/README.md\n', [
+        {filename: 'packages/core/src/Button/Button.tsx'},
       ]),
+    ).toBe(false);
+    // A rename header with another previous path.
+    expect(
+      diffMatchesFiles('diff --git a/x.ts b/b/new.ts\n', [
+        {filename: 'b/new.ts', previous_filename: 'b/old.ts'},
+      ]),
+    ).toBe(false);
+    // A duplicated header cannot stand in for a missing file.
+    expect(
+      diffMatchesFiles('diff --git a/a.md b/a.md\ndiff --git a/a.md b/a.md\n', [
+        {filename: 'a.md'},
+        {filename: 'c.md'},
+      ]),
+    ).toBe(false);
+  });
+
+  it('matches quoted paths by count, only against quoted headers', () => {
+    const quoted = 'diff --git "a/\\303\\251" "b/\\303\\251"\n';
+    expect(diffMatchesFiles(quoted, [{filename: '\u00e9'}])).toBe(true);
+    // An unquoted header for another file cannot absorb a quoted one.
+    expect(
+      diffMatchesFiles('diff --git a/x.ts b/x.ts\n', [{filename: '\u00e9'}]),
+    ).toBe(false);
+  });
+
+  it('compares two file listings as the same change', () => {
+    const file = {filename: 'a.md', status: 'modified', sha: '1'};
+    expect(sameFileList([file], [{...file}])).toBe(true);
+    expect(sameFileList([file], [{...file, sha: '2'}])).toBe(false);
+    expect(sameFileList([file], [{...file, status: 'removed'}])).toBe(false);
+    expect(sameFileList([file], [file, file])).toBe(false);
+    expect(
+      sameFileList(
+        [file, {filename: 'b.md', status: 'added', sha: '3'}],
+        [{filename: 'b.md', status: 'added', sha: '3'}, file],
+      ),
     ).toBe(true);
   });
 });

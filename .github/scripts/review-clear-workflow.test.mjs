@@ -90,7 +90,10 @@ function harness(
     onPullGet,
     statusFailure = false,
     statuses = [pendingGate],
-    runHead = {repo: REPOSITORY, owner: 'facebook', branch: BRANCH, sha: head2},
+    // Mirrors workflow_run for a review: head_repository always names this
+    // repository (even for a fork PR), and pull_requests lists only
+    // same-repository PRs.
+    runHead = {branch: BRANCH, sha: head2, pullRequests: [{number: 17}]},
     ...single
   } = {},
 ) {
@@ -109,22 +112,20 @@ function harness(
         get: async ({pull_number: number}) => {
           const count = (reads.get(number) ?? 0) + 1;
           reads.set(number, count);
+          calls.push(`read:${number}`);
           const current = byNumber.get(number);
           if (moveAfterFirstRead && count > 1) current.head.sha = head3;
           onPullGet?.(number, count, current);
           const {reviews: _reviews, ...detail} = structuredClone(current);
           return {data: detail};
         },
-        // Mirrors GitHub's `head` filter: owner and branch only.
         list: async ({head}) => {
-          calls.push(`list:${head}`);
+          if (head !== undefined)
+            throw new Error('the resolver must not filter by head');
+          calls.push('list:open');
           return {
             data: [...byNumber.values()]
-              .filter(
-                candidate =>
-                  `${candidate.head.repo.full_name.split('/')[0]}:${candidate.head.ref}` ===
-                  head,
-              )
+              .filter(candidate => candidate.state === 'open')
               .map(listed),
           };
         },
@@ -143,9 +144,14 @@ function harness(
           };
         },
         listCommitStatusesForRef: async () => ({data: statuses}),
+        // Like GitHub, commit association never lists a fork PR.
         listPullRequestsAssociatedWithCommit: async ({commit_sha: sha}) => ({
           data: [...byNumber.values()]
-            .filter(candidate => candidate.head.sha === sha)
+            .filter(
+              candidate =>
+                candidate.head.sha === sha &&
+                candidate.head.repo.full_name === REPOSITORY,
+            )
             .map(listed),
         }),
         createCommitStatus: async input => {
@@ -170,12 +176,10 @@ function harness(
     payload: {
       workflow_run: {
         event: 'pull_request_review',
-        head_repository: {
-          full_name: runHead.repo,
-          owner: {login: runHead.owner},
-        },
+        head_repository: {full_name: REPOSITORY, owner: {login: 'facebook'}},
         head_branch: runHead.branch,
         head_sha: runHead.sha,
+        pull_requests: runHead.pullRequests ?? [],
       },
     },
   };
@@ -211,7 +215,7 @@ describe('review-clear exact-head workflow', () => {
 
     await run(h);
 
-    expect(h.calls.filter(call => String(call).startsWith('read:'))).toEqual([
+    expect(h.calls.filter(call => String(call).endsWith(HELPER))).toEqual([
       `read:${workflowSha}:${HELPER}`,
     ]);
   });
@@ -361,41 +365,139 @@ describe('review-clear exact-head workflow', () => {
   );
 
   describe('identifying the reviewed pull request', () => {
-    it('ignores another repository whose branch has the same name', async () => {
+    // Shapes observed on a real fork PR review: the run names this repository
+    // as head_repository, lists no PRs, and commit association is empty.
+    const FORK_SHA = 'bdb68723850d7add16d34e04528566402e7632f8';
+    const FORK_BRANCH = 'potatowagon/richtext-theme-target';
+    const forkRun = {branch: FORK_BRANCH, sha: FORK_SHA, pullRequests: []};
+    const forkPull = (reviews, options = {}) =>
+      pull({
+        number: 6744,
+        headRepo: 'potatowagon/astryx',
+        headRef: FORK_BRANCH,
+        headSha: FORK_SHA,
+        reviews,
+        ...options,
+      });
+    const onPr = (calls, number) =>
+      mutations(calls).filter(
+        call => call.input.issue_number === number || call.input.sha,
+      );
+
+    it('clears a fork PR gate on an exact-head approval', async () => {
       const h = harness([], {
-        pulls: [
-          pull({reviews: [review('APPROVED')]}),
-          pull({
-            number: 18,
-            headRepo: 'facebook/astryx-mirror',
-            headSha: head1,
-            reviews: [review('APPROVED', head1)],
-          }),
-        ],
+        pulls: [forkPull([review('APPROVED', FORK_SHA)])],
+        runHead: forkRun,
       });
 
       await run(h);
 
-      expect(h.calls).toContain('list:facebook:feature');
-      expect(mutations(h.calls)).toContainEqual(
-        expect.objectContaining({
+      expect(mutations(h.calls)).toEqual([
+        {
           type: 'remove-label',
-          input: expect.objectContaining({issue_number: 17}),
-        }),
+          input: expect.objectContaining({
+            issue_number: 6744,
+            name: 'needs:code-review',
+          }),
+        },
+        {
+          type: 'status',
+          input: expect.objectContaining({
+            sha: FORK_SHA,
+            context: 'review-required',
+            state: 'success',
+            description: 'Cleared by code-owner approval.',
+          }),
+        },
+      ]);
+    });
+
+    it('restores a fork PR gate after exact-head changes requested', async () => {
+      const h = harness([], {
+        pulls: [
+          forkPull(
+            [
+              review('APPROVED', FORK_SHA),
+              review('CHANGES_REQUESTED', FORK_SHA),
+            ],
+            {labels: []},
+          ),
+        ],
+        runHead: forkRun,
+        statuses: [clearedGate],
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([
+        {
+          type: 'status',
+          input: expect.objectContaining({
+            sha: FORK_SHA,
+            state: 'pending',
+            description: 'Waiting on code review after approval withdrawal.',
+          }),
+        },
+        {
+          type: 'add-label',
+          input: expect.objectContaining({issue_number: 6744}),
+        },
+      ]);
+    });
+
+    it('resolves a fork PR whose branch is named like the default branch', async () => {
+      const h = harness([], {
+        pulls: [
+          pull({
+            number: 6748,
+            headRepo: 'someone/astryx',
+            headRef: 'main',
+            headSha: head1,
+            reviews: [review('APPROVED', head1)],
+          }),
+        ],
+        runHead: {branch: 'main', sha: head1, pullRequests: []},
+      });
+
+      await run(h);
+
+      expect(onPr(h.calls, 6748)).toContainEqual({
+        type: 'status',
+        input: expect.objectContaining({sha: head1, state: 'success'}),
+      });
+    });
+
+    it('clears a same-repository PR listed by the run', async () => {
+      const h = harness([review('APPROVED')]);
+
+      await run(h);
+
+      expect(mutations(h.calls)).toContainEqual({
+        type: 'status',
+        input: expect.objectContaining({sha: head2, state: 'success'}),
+      });
+    });
+
+    it('requires the reviewed branch as well as the commit', async () => {
+      // Same commit, but pushed to a differently named branch.
+      const h = harness([], {
+        pulls: [
+          forkPull([review('APPROVED', FORK_SHA)], {headRef: 'another-branch'}),
+        ],
+        runHead: forkRun,
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([]);
+      expect(h.calls).toContain(
+        `info:No open PR has head ${FORK_BRANCH}@${FORK_SHA.slice(0, 7)}; the flag job reconciles any newer head.`,
       );
-      expect(
-        mutations(h.calls).some(call => call.input.issue_number === 18),
-      ).toBe(false);
     });
 
     it('does nothing when no open PR still has the reviewed head', async () => {
       const h = harness([review('APPROVED')], {
-        runHead: {
-          repo: REPOSITORY,
-          owner: 'facebook',
-          branch: BRANCH,
-          sha: head1,
-        },
+        runHead: {branch: BRANCH, sha: head1, pullRequests: [{number: 17}]},
       });
 
       await run(h);
@@ -403,12 +505,14 @@ describe('review-clear exact-head workflow', () => {
       expect(mutations(h.calls)).toEqual([]);
     });
 
-    it('never clears when the reviewed head backs several open PRs', async () => {
+    it('never clears when the reviewed head and branch back several open PRs', async () => {
+      // An upstream PR and a fork PR on the same commit and branch name.
       const h = harness([], {
         pulls: [
           pull({reviews: [review('APPROVED')]}),
           pull({
             number: 18,
+            headRepo: 'someone/astryx',
             baseRef: 'feature/lower',
             reviews: [review('APPROVED')],
           }),
@@ -427,7 +531,7 @@ describe('review-clear exact-head workflow', () => {
 
       expect(mutations(h.calls)).toEqual([]);
       expect(h.calls).toContain(
-        `warning:Head ${head2.slice(0, 7)} backs open PRs #17, #18; restoring gates only, never clearing.`,
+        `warning:Head ${head2.slice(0, 7)} on ${BRANCH} backs open PRs #17, #18; restoring gates only, never clearing.`,
       );
     });
 
@@ -546,5 +650,42 @@ describe('review-clear exact-head workflow', () => {
         mutations(h.calls).filter(call => call.type === 'status'),
       ).toHaveLength(1);
     });
+  });
+
+  it('re-reads the PR before every mutation', async () => {
+    const h = harness([review('APPROVED')], {
+      statuses: [pendingGate],
+    });
+    h.github.rest.checks.listForRef = async () => ({
+      data: {check_runs: [{id: 9, conclusion: 'action_required'}]},
+    });
+
+    await run(h);
+
+    let readSinceWrite = false;
+    const order = h.calls.filter(
+      call =>
+        call === 'read:17' ||
+        ['add-label', 'remove-label', 'status', 'check-update'].includes(
+          call?.type,
+        ),
+    );
+    expect(order.map(call => call?.type ?? call)).toEqual([
+      'read:17', // candidate
+      'read:17', // reconcile
+      'read:17', // before removing the label
+      'remove-label',
+      'read:17',
+      'status',
+      'read:17',
+      'check-update',
+    ]);
+    for (const call of order) {
+      if (call === 'read:17') readSinceWrite = true;
+      else {
+        expect(readSinceWrite).toBe(true);
+        readSinceWrite = false;
+      }
+    }
   });
 });

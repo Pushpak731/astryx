@@ -288,8 +288,10 @@ function workflowRunEvent(triggeringEvent) {
           action: 'completed',
           workflow_run: {
             event: triggeringEvent,
+            // A fork PR's review run names this repository here.
             head_repository: {full_name: REPOSITORY},
             head_branch: 'feature/upper',
+            head_sha: 'c'.repeat(40),
           },
         },
         ref: 'refs/heads/main',
@@ -451,8 +453,10 @@ describe('stacked pull request gate triggers', () => {
   it('keeps skipped review-clear runs from cancelling a reconciliation', () => {
     const afterReview = workflowRunEvent('pull_request_review');
     expect(runningJobs(reviewClear, afterReview)).toEqual(['clear']);
+    // Keyed by the reviewed commit, never by head_repository, which names
+    // this repository even for a fork PR's review.
     expect(concurrencyGroup(reviewClear, afterReview)).toBe(
-      `review-clear-${REPOSITORY}-feature/upper`,
+      `review-clear-sha-${'c'.repeat(40)}`,
     );
 
     for (const triggeringEvent of [

@@ -153,24 +153,57 @@ function governedSiblings(pr, candidates) {
     .sort((left, right) => left - right);
 }
 
+// Git quotes a path containing a control character, a double quote, a
+// backslash, or a non-ASCII byte.
+function gitQuotesPath(filePath) {
+  return !/^[\x20-\x7e]*$/.test(filePath) || /["\\]/.test(filePath);
+}
+
 /**
  * Whether a unified diff describes exactly the listed changed files. The file
- * list and the diff come from separate requests, so a push or retarget between
- * them would otherwise classify one change with another's content. Paths git
- * quotes are counted but not compared by name.
+ * list and the diff come from separate requests, so a push, a retarget, or an
+ * inconsistent response between them would otherwise decide one change from
+ * another's content. Every file whose paths git leaves unquoted must have its
+ * own `diff --git a/<previous> b/<current>` header (renames and deletions
+ * included); files with quoted paths are matched by count against the headers
+ * left over, which must all be quoted.
  */
 function diffMatchesFiles(diff, files) {
-  const headers = String(diff)
+  const remaining = String(diff)
     .split('\n')
     .filter(line => line.startsWith('diff --git '));
-  if (headers.length !== files.length) return false;
-  const present = new Set(headers);
-  return files.every(file => {
+  if (remaining.length !== files.length) return false;
+  let quotedFiles = 0;
+  for (const file of files) {
     const previous = file.previous_filename || file.filename;
-    const paths = `${previous}${file.filename}`;
-    if (!/^[\x20-\x7e]+$/.test(paths) || /["\\]/.test(paths)) return true;
-    return present.has(`diff --git a/${previous} b/${file.filename}`);
-  });
+    if (gitQuotesPath(previous) || gitQuotesPath(file.filename)) {
+      quotedFiles += 1;
+      continue;
+    }
+    const index = remaining.indexOf(
+      `diff --git a/${previous} b/${file.filename}`,
+    );
+    if (index < 0) return false;
+    remaining.splice(index, 1);
+  }
+  return (
+    remaining.length === quotedFiles &&
+    remaining.every(header => header.includes('"'))
+  );
+}
+
+/** Whether two changed-file listings describe the same change. */
+function sameFileList(left, right) {
+  const key = file =>
+    [
+      file.filename,
+      file.previous_filename ?? '',
+      file.status,
+      file.sha ?? '',
+    ].join('\0');
+  const a = left.map(key).sort();
+  const b = right.map(key).sort();
+  return a.length === b.length && a.every((value, index) => value === b[index]);
 }
 
 module.exports = {
@@ -182,5 +215,6 @@ module.exports = {
   isSafeSpace,
   pullIdentity,
   resolveReviewApprovals,
+  sameFileList,
   samePullIdentity,
 };

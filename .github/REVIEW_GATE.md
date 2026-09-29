@@ -145,8 +145,8 @@ internal contributors' PRs. Owners still self-serve their own domain.
    ┌─────────────────────────────────────────────┐
    │ review-clear.yml  (workflow_run, base token) │  ← works for fork PRs
    └─────────────────────────────────────────────┘
-     resolve the PR by the run's exact head repository, branch, and commit
-     (several open PRs on that head: restore only, never clear)
+     resolve the PR by the run's head commit and branch (not head_repository,
+     which names this repo for forks); several matches: restore only
      entitled CODEOWNER approved?
        → drop needs:code-review · status → success 🟢 · neutralize stale check
 
@@ -177,10 +177,18 @@ scoped ones. If two open pull requests that both read the required contexts
 share a head, neither gate can decide for both: the context stays `pending`
 ("shared with open PR #…") until the heads differ.
 
-Each run classifies the live pull request and re-reads it before every status
-write or other side effect. A moved head, base, base commit, or stack starts the
-classification over (at most three attempts, then the run fails without a
-decision). The file list and the diff are checked against each other.
+Each run classifies the live pull request and re-reads it immediately before
+every status, label, comment, reviewer request, check-run, and auto-merge
+change. The two exceptions are the spec gate's initial "Reconciling" marker,
+written right after the read it follows, and withdrawing an auto-merge enable
+that the run itself just made because the pull request moved. A moved head,
+base, base commit, or stack starts the classification over (at most three
+attempts, then the run fails without a decision). The changed-file list decides
+the gate and the diff feeds the visual classifier, so review-signal requires
+them to describe the same files (renames and deletions included) before
+deciding anything; a disagreement is retried the same way and never produces a
+decision. GitHub refuses a diff for a very large pull request; then the file
+list is read twice and must match, and the visual classifier is skipped.
 
 `pull_request_target` and `workflow_run` always run the default branch's
 workflow file, and a manual dispatch publishes only from the default branch's
@@ -189,10 +197,17 @@ and review-clear load their decision helper from the workflow commit, and the
 visual classifier loads from the base commit only when the base is the default
 branch. Only runs that reclassify a pull request share its cancellation group,
 so review events, title/body edits, and non-review `workflow_run` completions
-cannot cancel a classification in progress. Review-clear identifies the reviewed
-pull request by the exact head repository, branch, and commit; when that head
-backs several open pull requests, it restores withdrawn gates but never clears
-one.
+cannot cancel a classification in progress.
+
+Review-clear identifies the reviewed pull request by the head commit and branch
+the review run recorded. The run's `head_repository` is not evidence: for a fork
+pull request it names this repository, and the run lists no pull requests.
+Candidates come from the run's own list, GitHub's commit association, and every
+open pull request whose head is that exact commit (the only source that finds a
+fork pull request); each is re-read and must match the commit and branch. When
+more than one open pull request matches, review-clear restores withdrawn gates
+but never clears one. Same-head checks in all three workflows scan the open pull
+requests for the same reason.
 
 The spec gate enables auto-merge only for a pull request that targets the
 default branch directly and is not part of a stack. It withdraws auto-merge it

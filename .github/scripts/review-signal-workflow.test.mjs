@@ -96,6 +96,7 @@ async function runSignal({
   files,
   filesForBase,
   diff,
+  secondFiles,
   statuses = [],
 } = {}) {
   delete globalThis.__untrustedClassifierRan;
@@ -103,15 +104,24 @@ async function runSignal({
     pr: structuredClone(live),
     others: new Map(others.map(other => [other.number, other])),
     pullGets: 0,
+    fileReads: 0,
+    diffReads: 0,
+    // Ordered reads of this PR and mutations, to check every mutation re-reads.
+    log: [],
   };
   const filesNow = () => filesForBase?.[state.pr.base.ref] ?? files ?? README;
+  const logged = (name, fn) =>
+    vi.fn(async (...args) => {
+      state.log.push(`write:${name}`);
+      return fn(...args);
+    });
   const mutations = {
-    createCommitStatus: vi.fn(),
-    addLabels: vi.fn(),
-    removeLabel: vi.fn(),
-    requestReviewers: vi.fn(),
-    updateCheck: vi.fn(),
-    graphql: vi.fn(),
+    createCommitStatus: logged('status', async () => {}),
+    addLabels: logged('add-label', async () => {}),
+    removeLabel: logged('remove-label', async () => {}),
+    requestReviewers: logged('request-reviewers', async () => {}),
+    updateCheck: logged('update-check', async () => {}),
+    graphql: logged('graphql', async () => {}),
   };
   const contentReads = [];
   const getContent = vi.fn(async ({path: filePath, ref}) => {
@@ -139,11 +149,14 @@ async function runSignal({
   });
   const github = {
     paginate: async (method, options) => (await method(options)).data,
-    request: async () => ({
-      data:
-        (typeof diff === 'function' ? diff(state) : diff) ??
-        diffFor(filesNow()),
-    }),
+    request: async () => {
+      state.diffReads += 1;
+      const served = typeof diff === 'function' ? diff(state) : diff;
+      if (served === 'too-large') {
+        throw Object.assign(new Error('diff too large'), {status: 406});
+      }
+      return {data: served ?? diffFor(filesNow())};
+    },
     graphql: mutations.graphql,
     rest: {
       pulls: {
@@ -152,6 +165,7 @@ async function runSignal({
             return {data: structuredClone(state.others.get(number))};
           }
           state.pullGets += 1;
+          state.log.push('read:pull');
           onPullGet?.(state.pullGets, state);
           // A fresh object per read, as from the API.
           return {data: structuredClone(state.pr)};
@@ -159,7 +173,15 @@ async function runSignal({
         list: vi.fn(async () => ({
           data: [state.pr, ...state.others.values()].map(listed),
         })),
-        listFiles: vi.fn(async () => ({data: filesNow()})),
+        listFiles: vi.fn(async () => {
+          state.fileReads += 1;
+          return {
+            data:
+              secondFiles && state.fileReads % 2 === 0
+                ? secondFiles
+                : filesNow(),
+          };
+        }),
         listReviews: async () => ({data: reviews}),
         requestReviewers: mutations.requestReviewers,
       },
@@ -167,9 +189,14 @@ async function runSignal({
         getContent,
         createCommitStatus: mutations.createCommitStatus,
         listCommitStatusesForRef: async () => ({data: statuses}),
+        // Like GitHub, commit association never lists a fork PR.
         listPullRequestsAssociatedWithCommit: async ({commit_sha: sha}) => ({
           data: [state.pr, ...state.others.values()]
-            .filter(candidate => candidate.head.sha === sha)
+            .filter(
+              candidate =>
+                candidate.head.sha === sha &&
+                candidate.head.repo.full_name === 'facebook/astryx',
+            )
             .map(listed),
         }),
       },
@@ -284,7 +311,11 @@ describe('review-signal trusted helper ref', () => {
         description: 'Waiting on code review: community contribution',
       });
       if (options.backfill) {
-        expect(h.github.rest.pulls.list).toHaveBeenCalledOnce();
+        // The first listing enumerates the backfill; later ones look for
+        // other open PRs on the same head.
+        expect(h.github.rest.pulls.list.mock.calls[0][0]).toMatchObject({
+          state: 'open',
+        });
       }
       // Every path classifies the live pull request it re-reads.
       expect(h.github.rest.pulls.get).toHaveBeenCalledWith({
@@ -626,8 +657,9 @@ describe('review-signal scope, identity, and shared heads', () => {
     it('reclassifies once when the base SHA moves before the write', async () => {
       const h = await runSignal({
         eventName: 'pull_request_target',
+        // Read 2 is the re-read immediately before the status write.
         onPullGet: (count, state) => {
-          if (count === 3) state.pr.base.sha = WORKFLOW_SHA;
+          if (count === 2) state.pr.base.sha = WORKFLOW_SHA;
         },
       });
 
@@ -651,7 +683,7 @@ describe('review-signal scope, identity, and shared heads', () => {
       });
 
       expect(h.core.warning).toHaveBeenCalledWith(
-        expect.stringContaining('PR #42 kept moving while it was classified'),
+        'Failed to flag PR #42: PR #42 moved while it was classified on every attempt; refusing to publish a decision.',
       );
       expect(h.core.setFailed).toHaveBeenCalledOnce();
       for (const mutation of Object.values(h.mutations)) {
@@ -687,43 +719,6 @@ describe('review-signal scope, identity, and shared heads', () => {
       for (const mutation of Object.values(h.mutations)) {
         expect(mutation).not.toHaveBeenCalled();
       }
-    });
-
-    it('fails the visual classifier closed when the diff describes other files', async () => {
-      const h = await runSignal({
-        eventName: 'pull_request_target',
-        diff: diffFor([{filename: 'packages/core/src/Other.tsx'}]),
-      });
-
-      expect(h.core.warning).toHaveBeenCalledWith(
-        'Content-based visual classification failed closed: the diff does not describe the changed-file list',
-      );
-      expect(statusWrites(h)).toEqual([
-        expect.objectContaining({context: 'review-required', state: 'pending'}),
-      ]);
-    });
-
-    it('reclassifies when a diff mismatch comes from a moved PR', async () => {
-      // The first diff was served for a newer push; the identity re-read that
-      // follows the mismatch sees the head move and starts over.
-      const h = await runSignal({
-        eventName: 'pull_request_target',
-        diff: state =>
-          state.pullGets === 1
-            ? diffFor([{filename: 'packages/core/src/Other.tsx'}])
-            : undefined,
-        onPullGet: (count, state) => {
-          if (count === 2) state.pr.head.sha = WORKFLOW_SHA;
-        },
-      });
-
-      expect(h.core.warning).not.toHaveBeenCalled();
-      expect(statusWrites(h)).toEqual([
-        expect.objectContaining({
-          sha: WORKFLOW_SHA,
-          context: 'review-required',
-        }),
-      ]);
     });
 
     it('does not flag a PR that closed before it was read', async () => {
@@ -775,6 +770,231 @@ describe('review-signal scope, identity, and shared heads', () => {
     expect(statusWrites(h)).toEqual([
       expect.objectContaining({sha: HEAD, state: 'pending'}),
       expect.objectContaining({sha: LOWER_HEAD, state: 'success'}),
+    ]);
+  });
+});
+
+describe('review-signal file list and diff consistency', () => {
+  const BUTTON = 'packages/core/src/Button/Button.tsx';
+  const buttonDiff = diffFor([{filename: BUTTON}]);
+
+  it.each([
+    ['a design owner', 'designer'],
+    ['a contributor', 'contributor'],
+  ])(
+    'never decides for %s when the diff describes other files',
+    async (_name, author) => {
+      // Equal counts: the list says README.md, the diff says a Core file.
+      const h = await runSignal({
+        eventName: 'pull_request_target',
+        live: pull({author}),
+        diff: buttonDiff,
+      });
+
+      expect(h.state.diffReads).toBe(3);
+      expect(h.core.warning).toHaveBeenCalledWith(
+        'Failed to flag PR #42: PR #42 served a diff that does not describe its changed-file list on every attempt; refusing to publish a decision.',
+      );
+      expect(h.core.setFailed).toHaveBeenCalledOnce();
+      for (const mutation of Object.values(h.mutations)) {
+        expect(mutation).not.toHaveBeenCalled();
+      }
+    },
+  );
+
+  it('recovers when a later attempt serves a consistent diff', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live: pull({author: 'designer'}),
+      diff: state => (state.diffReads === 1 ? buttonDiff : undefined),
+    });
+
+    expect(h.core.setFailed).not.toHaveBeenCalled();
+    expect(h.state.diffReads).toBe(2);
+    expect(statusWrites(h)).toEqual([
+      expect.objectContaining({
+        context: 'review-required',
+        state: 'success',
+        description: 'No code review required.',
+      }),
+    ]);
+  });
+
+  it('accepts renames and deletions whose headers match', async () => {
+    const changed = [
+      {
+        filename: 'docs/new.md',
+        previous_filename: 'docs/old.md',
+        status: 'renamed',
+      },
+      {filename: 'docs/gone.md', status: 'removed'},
+    ];
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live: pull({author: 'engineer', changedFiles: 2}),
+      files: changed,
+      diff: [
+        'diff --git a/docs/old.md b/docs/new.md',
+        'similarity index 100%',
+        'rename from docs/old.md',
+        'rename to docs/new.md',
+        'diff --git a/docs/gone.md b/docs/gone.md',
+        'deleted file mode 100644',
+        '',
+      ].join('\n'),
+    });
+
+    expect(h.core.setFailed).not.toHaveBeenCalled();
+    expect(statusWrites(h)).toEqual([
+      expect.objectContaining({state: 'success'}),
+    ]);
+  });
+
+  it('rejects a rename whose previous path differs from the diff', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live: pull({author: 'engineer'}),
+      files: [
+        {
+          filename: 'docs/new.md',
+          previous_filename: 'docs/old.md',
+          status: 'renamed',
+        },
+      ],
+      diff: 'diff --git a/packages/core/src/index.ts b/docs/new.md\n',
+    });
+
+    expect(h.core.setFailed).toHaveBeenCalledOnce();
+    expect(statusWrites(h)).toEqual([]);
+  });
+
+  it('checks the file list against a second read when GitHub refuses the diff', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live: pull({author: 'engineer'}),
+      diff: 'too-large',
+    });
+
+    expect(h.core.setFailed).not.toHaveBeenCalled();
+    expect(h.state.fileReads).toBe(2);
+    expect(statusWrites(h)).toEqual([
+      expect.objectContaining({state: 'success'}),
+    ]);
+  });
+
+  it('never decides when a refused diff leaves two different file lists', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live: pull({author: 'designer'}),
+      diff: 'too-large',
+      secondFiles: [{filename: BUTTON, status: 'modified'}],
+    });
+
+    expect(h.core.warning).toHaveBeenCalledWith(
+      'Failed to flag PR #42: PR #42 served two different changed-file lists on every attempt; refusing to publish a decision.',
+    );
+    expect(statusWrites(h)).toEqual([]);
+  });
+});
+
+describe('review-signal re-reads the PR before every mutation', () => {
+  const everyWriteFollowsARead = log => {
+    let readSinceWrite = false;
+    for (const entry of log) {
+      if (entry === 'read:pull') readSinceWrite = true;
+      else if (entry.startsWith('write:')) {
+        if (!readSinceWrite) return false;
+        readSinceWrite = false;
+      }
+    }
+    return true;
+  };
+
+  it('for labels, reviewer requests, auto-merge, statuses, and check runs', async () => {
+    // A contributor's design-affecting Core change with auto-merge on and a
+    // stale scoped status exercises every mutation the flag job can make.
+    const live = {
+      ...pull({author: 'contributor'}),
+      labels: [{name: 'needs:design-review'}],
+      auto_merge: {merge_method: 'squash'},
+    };
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live,
+      files: [
+        {
+          filename: 'packages/core/src/Button/Button.stylex.ts',
+          status: 'modified',
+        },
+      ],
+      statuses: [{context: 'review-required/stacked-pr-42', state: 'pending'}],
+    });
+
+    expect(h.core.setFailed).not.toHaveBeenCalled();
+    expect(h.state.log.filter(entry => entry.startsWith('write:'))).toEqual(
+      expect.arrayContaining([
+        'write:add-label',
+        'write:request-reviewers',
+        'write:graphql',
+        'write:status',
+      ]),
+    );
+    expect(everyWriteFollowsARead(h.state.log)).toBe(true);
+  });
+
+  it('drops a decision when the PR moves on the read before its write', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live: {
+        ...pull({author: 'contributor'}),
+        auto_merge: {merge_method: 'squash'},
+      },
+      // Read 3 guards the status write of the first attempt.
+      onPullGet: (count, state) => {
+        if (count === 3) state.pr.base.sha = WORKFLOW_SHA;
+      },
+    });
+
+    expect(h.core.setFailed).not.toHaveBeenCalled();
+    expect(h.state.log).toEqual([
+      'read:pull', // attempt 1
+      'read:pull',
+      'write:graphql', // disable auto-merge (code review required)
+      'read:pull', // moved: the first attempt's status is never written
+      'read:pull', // attempt 2
+      'read:pull',
+      'write:graphql',
+      'read:pull',
+      'write:status',
+    ]);
+    expect(statusWrites(h)).toEqual([
+      expect.objectContaining({context: 'review-required', state: 'pending'}),
+    ]);
+  });
+
+  it('finds a fork PR that shares the head, which commit association omits', async () => {
+    const fork = {
+      ...pull({number: 6744, baseRef: STACKED_BASE, baseSha: LOWER_HEAD}),
+      head: {
+        sha: HEAD,
+        ref: 'someone/branch',
+        repo: {full_name: 'someone/astryx'},
+      },
+      stack: NATIVE_TRUNK,
+    };
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live: pull({author: 'engineer'}),
+      others: [fork],
+    });
+
+    expect(statusWrites(h)).toEqual([
+      expect.objectContaining({
+        context: 'review-required',
+        state: 'pending',
+        description:
+          'Head is shared with open PR #6744; each needs its own head.',
+      }),
     ]);
   });
 });

@@ -32,6 +32,10 @@ const {
 // reconciled again, at most this many times, before the run fails.
 const MAX_ATTEMPTS = 3;
 
+// Thrown by the live guard before a mutation when the pull request settled or
+// moved. The attempt stops; a moved base or stack starts a new attempt.
+class Superseded extends Error {}
+
 function isCommandComment(eventName, payload) {
   if (eventName !== 'issue_comment') return true;
   return parseOwnerCommandIntent(payload.comment?.body) !== null;
@@ -223,6 +227,15 @@ async function reconcileSpecOwnerGate({
   }
 
   /**
+   * Called immediately before every mutation other than the initial pending
+   * marker (written right after the read it follows) and the withdrawal of an
+   * auto-merge this run just enabled (a reaction to movement).
+   */
+  async function guard() {
+    if (!(await isLiveHeadWritable(gate.pr.head.sha))) throw new Superseded();
+  }
+
+  /**
    * The last read before a terminal write. GitHub has no conditional status
    * write, so the window cannot be closed — it can only be made as small as
    * one API call and made to fail closed. Read the run currency first and the
@@ -276,23 +289,30 @@ async function reconcileSpecOwnerGate({
    */
   async function sharedHeadSiblings(headSha) {
     if (!gate.scope.governed) return [];
+    // Commit association omits fork pull requests, so also scan the open ones
+    // for this exact head.
     const associated = await github.paginate(
       github.rest.repos.listPullRequestsAssociatedWithCommit,
       {owner, repo, commit_sha: headSha, per_page: 100},
     );
+    const open = await github.paginate(github.rest.pulls.list, {
+      owner,
+      repo,
+      state: 'open',
+      per_page: 100,
+    });
+    const numbers = new Set(
+      [...associated, ...open]
+        .filter(other => other.state === 'open' && other.head?.sha === headSha)
+        .map(other => other.number),
+    );
+    numbers.delete(pullNumber);
     const others = [];
-    for (const other of associated) {
-      if (
-        other.number === pullNumber ||
-        other.state !== 'open' ||
-        other.head?.sha !== headSha
-      ) {
-        continue;
-      }
+    for (const number of numbers) {
       const {data} = await github.rest.pulls.get({
         owner,
         repo,
-        pull_number: other.number,
+        pull_number: number,
       });
       others.push(data);
     }
@@ -333,6 +353,7 @@ async function reconcileSpecOwnerGate({
   }
 
   async function removeLabel(name) {
+    await guard();
     try {
       await github.rest.issues.removeLabel({
         owner,
@@ -346,6 +367,7 @@ async function reconcileSpecOwnerGate({
   }
 
   async function ensureLabel(pr, name, color, description) {
+    await guard();
     try {
       await github.rest.issues.getLabel({owner, repo, name});
     } catch (error) {
@@ -372,10 +394,14 @@ async function reconcileSpecOwnerGate({
     }
   }
 
-  async function disableAutoMerge(pr, {requireOwnership = true} = {}) {
+  async function disableAutoMerge(
+    pr,
+    {requireOwnership = true, guarded = true} = {},
+  ) {
     if (requireOwnership && !labelNames(pr).has(env.AUTO_MERGE_LABEL)) {
       return;
     }
+    if (guarded) await guard();
     if (pr.auto_merge) {
       await github.graphql(
         `mutation($id: ID!) {
@@ -385,8 +411,19 @@ async function reconcileSpecOwnerGate({
         }`,
         {id: pr.node_id},
       );
+      // A marker left with auto-merge off is harmless (later runs remove it).
+      if (guarded) await guard();
     }
-    await removeLabel(env.AUTO_MERGE_LABEL);
+    try {
+      await github.rest.issues.removeLabel({
+        owner,
+        repo,
+        issue_number: pullNumber,
+        name: env.AUTO_MERGE_LABEL,
+      });
+    } catch (error) {
+      if (error.status !== 404) throw error;
+    }
   }
 
   async function readText(fullName, ref, filePath) {
@@ -510,6 +547,7 @@ async function reconcileSpecOwnerGate({
         status => status.context === stackedContext,
       );
       if (stale?.state === 'pending') {
+        await guard();
         await createStatus({
           sha: headSha,
           context: stackedContext,
@@ -518,6 +556,7 @@ async function reconcileSpecOwnerGate({
         });
       }
     } catch (error) {
+      if (error instanceof Superseded) throw error;
       core.warning(`Could not retire ${stackedContext}: ${error.message}`);
     }
   }
@@ -573,6 +612,7 @@ async function reconcileSpecOwnerGate({
       eventTime &&
       !Number.isNaN(Date.parse(eventTime))
     ) {
+      await guard();
       await createStatus({
         sha: initialHead,
         context: `${gate.readyPrefix}${actor}`,
@@ -622,6 +662,7 @@ async function reconcileSpecOwnerGate({
       const problem = describeOwnerCommandProblem(intent, initialHead);
       const marker = ownerCommandHelpMarker(initialHead);
       if (problem && !comments.some(entry => entry.body?.includes(marker))) {
+        await guard();
         await github.rest.issues.createComment({
           owner,
           repo,
@@ -854,7 +895,7 @@ async function reconcileSpecOwnerGate({
           identityMoved(live) ||
           !gateScope(live).autoMergeEligible)
       ) {
-        await disableAutoMerge(live, {requireOwnership: false});
+        await disableAutoMerge(live, {requireOwnership: false, guarded: false});
         core.warning(
           'The pull request moved as auto-merge was enabled; withdrew it.',
         );
@@ -868,6 +909,7 @@ async function reconcileSpecOwnerGate({
       ) {
         await disableAutoMerge(await getPullRequest(), {
           requireOwnership: false,
+          guarded: false,
         });
         return;
       }
@@ -875,7 +917,11 @@ async function reconcileSpecOwnerGate({
   }
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-    await reconcileOnce(attempt === 1);
+    try {
+      await reconcileOnce(attempt === 1);
+    } catch (error) {
+      if (!(error instanceof Superseded)) throw error;
+    }
     if (!gate?.moved) return;
     core.info(
       `Reconciling again after the pull request moved (attempt ${attempt} of ${MAX_ATTEMPTS}).`,

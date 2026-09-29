@@ -15,12 +15,15 @@
 # repository with a write-capable token. It never checks out or runs
 # PR-controlled code: its helper comes from the trusted workflow SHA.
 #
-# The reviewed PR is identified by the exact head the review run recorded
-# (repository, branch, and commit). When that head backs more than one open PR,
-# the run cannot tell which one was reviewed, so it only restores gates and
-# never clears one. A PR the default branch's protection does not govern owns
-# "review-required/stacked-pr-<number>" rather than "review-required" (see
-# review-signal.yml).
+# The reviewed PR is identified by the head commit and branch the review run
+# recorded. The run's head_repository is not evidence: for a fork PR it names
+# this repository, and the run lists no PRs. Candidates come from the run's own
+# PR list, GitHub's commit association, and every open PR whose head is that
+# exact commit; each is re-read and must match the commit and branch. When more
+# than one open PR matches, the run cannot tell which one was reviewed, so it
+# only restores gates and never clears one. A PR the default branch's
+# protection does not govern owns "review-required/stacked-pr-<number>" rather
+# than "review-required" (see review-signal.yml).
 
 name: Review clear
 
@@ -34,8 +37,10 @@ permissions: {}
 concurrency:
   # Every Review signal run completes into this workflow, but only review runs
   # reconcile. Everything else is run-scoped so its skipped job cannot cancel a
-  # reconciliation in progress.
-  group: review-clear-${{ github.event.workflow_run.event == 'pull_request_review' && format('{0}-{1}', github.event.workflow_run.head_repository.full_name, github.event.workflow_run.head_branch) || format('run-{0}', github.run_id) }}
+  # reconciliation in progress. Review runs for one head commit reconcile the
+  # same candidates, so a newer one may replace an older one; the head
+  # repository is not used because a fork's run reports this repository.
+  group: review-clear-${{ github.event.workflow_run.event == 'pull_request_review' && format('sha-{0}', github.event.workflow_run.head_sha) || format('run-{0}', github.run_id) }}
   cancel-in-progress: true
 
 jobs:
@@ -62,14 +67,12 @@ jobs:
             const CODE = 'needs:code-review';
             const MAX_ATTEMPTS = 3;
 
-            // The review run records the reviewed head: its repository,
-            // branch, and commit. A branch name alone is ambiguous across
-            // forks, so all three must match.
-            const headRepo = run.head_repository?.full_name;
-            const headOwner = run.head_repository?.owner?.login;
+            // The review run records the reviewed head commit and branch. Its
+            // head_repository is not evidence: for a fork PR it names this
+            // repository, not the fork.
             const headBranch = run.head_branch;
             const headSha = run.head_sha;
-            if (!headRepo || !headOwner || !headBranch || !headSha) {
+            if (!headBranch || !headSha) {
               core.info('The review run does not identify a head; nothing to reconcile.');
               return;
             }
@@ -112,15 +115,37 @@ jobs:
               return;
             }
 
-            const listed = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open', head: `${headOwner}:${headBranch}`, per_page: 100,
+            // Candidate numbers from every source that can name the PR. The
+            // run lists only same-repository PRs, and commit association often
+            // lists none for an unmerged commit, so the open-PR scan by exact
+            // head commit is what finds a fork PR.
+            const numbers = new Set((run.pull_requests || []).map((pr) => pr.number));
+            try {
+              const associated = await github.paginate(
+                github.rest.repos.listPullRequestsAssociatedWithCommit,
+                { owner, repo, commit_sha: headSha, per_page: 100 },
+              );
+              for (const pr of associated) numbers.add(pr.number);
+            } catch (e) {
+              core.warning(`Could not read PRs associated with ${headSha.slice(0, 7)}: ${e.message}`);
+            }
+            const open = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100,
             });
-            const candidates = listed.filter((pr) =>
-              pr.head?.repo?.full_name === headRepo &&
-              pr.head.ref === headBranch &&
-              pr.head.sha === headSha);
+            for (const pr of open) {
+              if (pr.head?.sha === headSha) numbers.add(pr.number);
+            }
+            // Only the live PR decides: open, and its head is exactly the
+            // reviewed commit on the reviewed branch.
+            const candidates = [];
+            for (const number of [...numbers].sort((a, b) => a - b)) {
+              const { data: live } = await github.rest.pulls.get({ owner, repo, pull_number: number });
+              if (live.state === 'open' && live.head?.sha === headSha && live.head?.ref === headBranch) {
+                candidates.push(live);
+              }
+            }
             if (!candidates.length) {
-              core.info(`No open PR has head ${headRepo}@${headSha.slice(0, 7)}; the flag job reconciles any newer head.`);
+              core.info(`No open PR has head ${headBranch}@${headSha.slice(0, 7)}; the flag job reconciles any newer head.`);
               return;
             }
             // One head can back several open PRs (for example one to the
@@ -130,7 +155,7 @@ jobs:
             // review state was withdrawn.
             const ambiguous = candidates.length > 1;
             if (ambiguous) {
-              core.warning(`Head ${headSha.slice(0, 7)} backs open PRs ${candidates.map((pr) => `#${pr.number}`).join(', ')}; restoring gates only, never clearing.`);
+              core.warning(`Head ${headSha.slice(0, 7)} on ${headBranch} backs open PRs ${candidates.map((pr) => `#${pr.number}`).join(', ')}; restoring gates only, never clearing.`);
             }
             for (const candidate of candidates) {
               let settled = false;
@@ -211,14 +236,24 @@ jobs:
               // another open PR that also reads it shares the head, one PR's
               // approval cannot clear it (review-signal holds it pending).
               if (codeApproved && scope.governed) {
+                // Commit association omits fork PRs, so also scan the open
+                // PRs for this exact head.
                 const associated = await github.paginate(
                   github.rest.repos.listPullRequestsAssociatedWithCommit,
                   { owner, repo, commit_sha: headSha, per_page: 100 },
                 );
+                const openNow = await github.paginate(github.rest.pulls.list, {
+                  owner, repo, state: 'open', per_page: 100,
+                });
+                const sameHead = new Set(
+                  [...associated, ...openNow]
+                    .filter((other) => other.state === 'open' && other.head?.sha === headSha)
+                    .map((other) => other.number),
+                );
+                sameHead.delete(prNumber);
                 const others = [];
-                for (const other of associated) {
-                  if (other.number === prNumber || other.state !== 'open' || other.head?.sha !== headSha) continue;
-                  const { data } = await github.rest.pulls.get({ owner, repo, pull_number: other.number });
+                for (const number of sameHead) {
+                  const { data } = await github.rest.pulls.get({ owner, repo, pull_number: number });
                   others.push(data);
                 }
                 const siblings = decision.governedSiblings(full, others);
@@ -228,21 +263,29 @@ jobs:
                 }
               }
 
-              // Re-read immediately before either mutation. A head that moved
-              // after review resolution must be reconciled by review-signal for
-              // the new head, never by carrying this decision forward; a moved
-              // base or stack changes which context this PR owns.
-              const { data: current } = await github.rest.pulls.get({
-                owner, repo, pull_number: prNumber,
-              });
-              if (!decision.samePullIdentity(full, current)) {
+              // Re-read the PR immediately before every mutation. A head that
+              // moved after review resolution must be reconciled by
+              // review-signal for the new head, never by carrying this decision
+              // forward; a moved base or stack changes which context this PR
+              // owns, so the reconciliation starts over.
+              let labels = [];
+              async function liveState() {
+                const { data: current } = await github.rest.pulls.get({
+                  owner, repo, pull_number: prNumber,
+                });
+                if (decision.samePullIdentity(full, current)) {
+                  labels = current.labels.map((l) => l.name);
+                  return 'same';
+                }
                 if (current.state !== 'open' || current.head.sha !== headSha) {
                   core.info(`PR #${prNumber}: head moved while resolving approval; leaving gate as-is.`);
-                  return 'done';
+                  return 'gone';
                 }
                 return 'moved';
               }
-              const labels = current.labels.map((l) => l.name);
+              const stop = (state) => (state === 'moved' ? 'moved' : 'done');
+              let live = await liveState();
+              if (live !== 'same') return stop(live);
 
               if (codeWithdrawn) {
                 // The commit status is the hard gate; publish it before the advisory
@@ -253,6 +296,8 @@ jobs:
                   description: 'Waiting on code review after approval withdrawal.',
                 });
                 core.info(`${GATE} status → pending on #${prNumber}.`);
+                live = await liveState();
+                if (live !== 'same') return stop(live);
                 if (!labels.includes(CODE)) {
                   await github.rest.issues.addLabels({
                     owner, repo, issue_number: prNumber, labels: [CODE],
@@ -271,6 +316,8 @@ jobs:
                 } catch (e) {
                   core.warning(`Could not remove ${CODE} (may already be gone): ${e.message}`);
                 }
+                live = await liveState();
+                if (live !== 'same') return stop(live);
               }
               await github.rest.repos.createCommitStatus({
                 owner, repo, sha: headSha, context: GATE,
@@ -279,22 +326,29 @@ jobs:
               core.info(`${GATE} status → success on #${prNumber}.`);
               // Neutralize stale check-run(s) of the same name so the rollup isn't
               // dragged to failure by a pre-status action_required leftover.
+              let staleRuns = [];
               try {
                 const { data } = await github.rest.checks.listForRef({
                   owner, repo, ref: headSha, check_name: 'review-required', per_page: 100,
                 });
-                for (const cr of data.check_runs) {
-                  if (cr.conclusion && cr.conclusion !== 'success' && cr.conclusion !== 'neutral') {
-                    await github.rest.checks.update({
-                      owner, repo, check_run_id: cr.id,
-                      conclusion: 'neutral',
-                      output: { title: 'Superseded by review-required status', summary: 'Cleared by code-owner approval; see the review-required status.' },
-                    });
-                    core.info(`Neutralized stale check-run ${cr.id} on #${prNumber}.`);
-                  }
-                }
+                staleRuns = data.check_runs.filter((cr) =>
+                  cr.conclusion && cr.conclusion !== 'success' && cr.conclusion !== 'neutral');
               } catch (e) {
-                core.warning(`Could not neutralize stale check-run: ${e.message}`);
+                core.warning(`Could not list stale check-runs: ${e.message}`);
+              }
+              for (const cr of staleRuns) {
+                live = await liveState();
+                if (live !== 'same') return stop(live);
+                try {
+                  await github.rest.checks.update({
+                    owner, repo, check_run_id: cr.id,
+                    conclusion: 'neutral',
+                    output: { title: 'Superseded by review-required status', summary: 'Cleared by code-owner approval; see the review-required status.' },
+                  });
+                  core.info(`Neutralized stale check-run ${cr.id} on #${prNumber}.`);
+                } catch (e) {
+                  core.warning(`Could not neutralize stale check-run: ${e.message}`);
+                }
               }
               return 'done';
             }

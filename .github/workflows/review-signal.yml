@@ -149,10 +149,11 @@ jobs:
             const DESIGN = process.env.DESIGN_LABEL;
             const COMMUNITY = process.env.COMMUNITY_LABEL;
 
-            // A pull request that moves while it is classified is read and
-            // classified again, at most this many times, before the run fails.
+            // A pull request that moves, or whose file list and diff disagree,
+            // while it is classified is read and classified again, at most this
+            // many times, before the run fails without publishing a decision.
             const MAX_ATTEMPTS = 3;
-            const MOVED = 'moved';
+            class Retry extends Error {}
 
             // Resolve which PR(s) to flag: the payload PR on a PR event, the
             // `pr` input on manual dispatch, or every open PR when it's blank
@@ -212,6 +213,7 @@ jobs:
             if (hadError) core.setFailed('One or more PRs failed to flag; see warnings.');
 
             async function flagOne(number) {
+              let reason = '';
               for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
                 const { data: pr } = await github.rest.pulls.get({
                   owner, repo, pull_number: number,
@@ -220,16 +222,24 @@ jobs:
                   core.info(`PR #${number} is ${pr.state}; nothing to flag.`);
                   return;
                 }
-                if ((await flagSnapshot(pr)) !== MOVED) return;
-                core.info(`PR #${number} moved while it was classified (attempt ${attempt} of ${MAX_ATTEMPTS}); reading it again.`);
+                try {
+                  await flagSnapshot(pr);
+                  return;
+                } catch (e) {
+                  if (!(e instanceof Retry)) throw e;
+                  reason = e.message;
+                  core.info(`PR #${number} ${reason} (attempt ${attempt} of ${MAX_ATTEMPTS}); reading it again.`);
+                }
               }
-              throw new Error(`PR #${number} kept moving while it was classified; refusing to publish a decision for a head or base that is still changing.`);
+              throw new Error(`PR #${number} ${reason} on every attempt; refusing to publish a decision.`);
             }
 
             // ================= per-PR detection + routing =================
-            // Classify one snapshot of a live PR. Returns MOVED, without
-            // publishing, when the PR's head, base, or stack changed after the
-            // snapshot was read; every write re-reads the PR first.
+            // Classify one snapshot of a live PR. Throws Retry, with nothing
+            // further published, when the PR's head, base, or stack changed
+            // after the snapshot was read, or its file list and diff disagree.
+            // Every label, reviewer, auto-merge, and status change re-reads
+            // the PR first.
             async function flagSnapshot(pr) {
             const reviewDecision = await loadReviewDecision();
             // Commit statuses are shared by every PR with this head. Only a PR
@@ -243,6 +253,10 @@ jobs:
               });
               return !reviewDecision.samePullIdentity(pr, live);
             }
+            // Called immediately before every mutation.
+            async function ensureUnmoved() {
+              if (await moved()) throw new Retry('moved while it was classified');
+            }
             // The one path that writes the gate status. A required context is
             // shared by every PR with this head, so when another open PR that
             // also reads it shares the head, no single decision can be right
@@ -251,15 +265,24 @@ jobs:
               let finalState = state;
               let finalDescription = description;
               if (scope.governed) {
+                // Commit association omits fork PRs, so also scan the open
+                // PRs for this exact head.
+                const sameHead = new Set();
                 const associated = await github.paginate(
                   github.rest.repos.listPullRequestsAssociatedWithCommit,
                   { owner, repo, commit_sha: pr.head.sha, per_page: 100 },
                 );
+                const open = await github.paginate(github.rest.pulls.list, {
+                  owner, repo, state: 'open', per_page: 100,
+                });
+                for (const other of [...associated, ...open]) {
+                  if (other.state === 'open' && other.head?.sha === pr.head.sha) sameHead.add(other.number);
+                }
+                sameHead.delete(pr.number);
                 const others = [];
-                for (const other of associated) {
-                  if (other.number === pr.number || other.state !== 'open' || other.head?.sha !== pr.head.sha) continue;
+                for (const number of sameHead) {
                   const { data } = await github.rest.pulls.get({
-                    owner, repo, pull_number: other.number,
+                    owner, repo, pull_number: number,
                   });
                   others.push(data);
                 }
@@ -269,13 +292,12 @@ jobs:
                   finalDescription = `Head is shared with open PR ${siblings.map((n) => `#${n}`).join(', ')}; each needs its own head.`.slice(0, 140);
                 }
               }
-              if (await moved()) return MOVED;
+              await ensureUnmoved();
               await github.rest.repos.createCommitStatus({
                 owner, repo, sha: pr.head.sha,
                 context: GATE, state: finalState, description: finalDescription,
               });
               core.info(`${GATE} status: ${finalState}`);
-              return finalState;
             }
             const author = pr.user.login.toLowerCase();
             // Bots (Dependabot, github-actions, etc.) are our own automation,
@@ -317,10 +339,10 @@ jobs:
             // gate/community labels, and stop.
             if (authorIsBot) {
               core.info(`@${author} is a bot — exempt from review gates.`);
-              if (await moved()) return MOVED;
               const current = pr.labels.map((l) => l.name);
               for (const name of [CODE, DESIGN, COMMUNITY]) {
                 if (current.includes(name)) {
+                  await ensureUnmoved();
                   try {
                     await github.rest.issues.removeLabel({
                       owner, repo, issue_number: pr.number, name,
@@ -330,10 +352,11 @@ jobs:
                   }
                 }
               }
-              return publishGate(
+              await publishGate(
                 'success',
                 'Automated (bot) PR — exempt from review gates.',
               );
+              return;
             }
 
             // --- Changed files. ---
@@ -343,10 +366,43 @@ jobs:
             if (allFiles.length !== pr.changed_files) {
               // A push or retarget between the two reads changes the count;
               // otherwise the listing is incomplete and the gate fails closed.
-              if (await moved()) return MOVED;
+              await ensureUnmoved();
               throw new Error(
                 `GitHub returned ${allFiles.length} of ${pr.changed_files} changed files; refusing to classify an incomplete PR.`,
               );
+            }
+            // The file list decides the gate and the diff feeds the visual
+            // classifier; they are separate reads, so they must describe the
+            // same change before anything is decided. A disagreement is
+            // retried (the PR moved, or GitHub served inconsistent data) and
+            // never falls through to a decision. GitHub refuses a diff for a
+            // very large PR; then the list is read twice and must match, and
+            // the visual classifier is skipped (it fails closed).
+            let diff = null;
+            try {
+              ({ data: diff } = await github.request(
+                'GET /repos/{owner}/{repo}/pulls/{pull_number}',
+                { owner, repo, pull_number: pr.number,
+                  headers: { accept: 'application/vnd.github.diff' } },
+              ));
+              diff = String(diff);
+            } catch (e) {
+              if (e.status !== 406 && e.status !== 422) throw e;
+              core.info(`GitHub did not serve a diff for PR #${pr.number} (${e.status}); checking the file list against a second read.`);
+            }
+            if (diff !== null) {
+              if (!reviewDecision.diffMatchesFiles(diff, allFiles)) {
+                await ensureUnmoved();
+                throw new Retry('served a diff that does not describe its changed-file list');
+              }
+            } else {
+              const again = await github.paginate(github.rest.pulls.listFiles, {
+                owner, repo, pull_number: pr.number, per_page: 100,
+              });
+              if (!reviewDecision.sameFileList(allFiles, again)) {
+                await ensureUnmoved();
+                throw new Retry('served two different changed-file lists');
+              }
             }
             // A change is excluded as a safe-space change only when both its
             // current and previous path are safe. This keeps unsafe→safe and
@@ -460,17 +516,8 @@ jobs:
                   mod, mod.exports,
                   () => { throw new Error('classify-visual.js must stay dependency-free'); },
                 );
-                const { data: diff } = await github.request(
-                  'GET /repos/{owner}/{repo}/pulls/{pull_number}',
-                  { owner, repo, pull_number: pr.number,
-                    headers: { accept: 'application/vnd.github.diff' } },
-                );
-                // The diff and the file list are separate reads. A diff for
-                // other files means the PR moved (classify it again) or GitHub
-                // served inconsistent data (fail closed).
-                if (!reviewDecision.diffMatchesFiles(String(diff), allFiles)) {
-                  if (await moved()) return MOVED;
-                  throw new Error('the diff does not describe the changed-file list');
+                if (diff === null) {
+                  throw new Error('no diff is available for this PR');
                 }
                 const sources = {};
                 const coreRuntimeFiles = files.filter((file) =>
@@ -509,7 +556,7 @@ jobs:
                   ]);
                   sources[file.filename] = {base: baseSource, head: headSource};
                 }
-                visualClassification = mod.exports.classifyVisualDiff(String(diff), {
+                visualClassification = mod.exports.classifyVisualDiff(diff, {
                   ignorePath: isSafeSpace,
                   sources,
                 });
@@ -593,10 +640,6 @@ jobs:
             const designGated = designAffecting && !designApproved;
             core.info(`approvals: code=${codeApproved} design=${designApproved} → codeGated=${codeGated} designGated=${designGated}`);
 
-            // Labels, reviewer requests, and auto-merge all act on this snapshot's
-            // decision, so re-read the PR before any of them.
-            if (await moved()) return MOVED;
-
             // --- Apply labels. ---
             const current = pr.labels.map((l) => l.name);
             const toAdd = [];
@@ -608,6 +651,7 @@ jobs:
             // (authorIsOwner is defined above.)
             if (!authorIsOwner && !current.includes(COMMUNITY)) toAdd.push(COMMUNITY);
             if (toAdd.length) {
+              await ensureUnmoved();
               await github.rest.issues.addLabels({
                 owner, repo, issue_number: pr.number, labels: toAdd,
               });
@@ -615,6 +659,7 @@ jobs:
             // Keep it accurate: if an owner's PR somehow carries it (e.g. author
             // was added to an owners file after opening), drop it.
             if (authorIsOwner && current.includes(COMMUNITY)) {
+              await ensureUnmoved();
               try {
                 await github.rest.issues.removeLabel({
                   owner, repo, issue_number: pr.number, name: COMMUNITY,
@@ -627,6 +672,7 @@ jobs:
             // (fork-safe clearing — the pull_request_review clear job doesn't
             // fire for forks, so we reconcile here from the reviews we read).
             async function dropLabel(name) {
+              await ensureUnmoved();
               try {
                 await github.rest.issues.removeLabel({
                   owner, repo, issue_number: pr.number, name,
@@ -647,6 +693,7 @@ jobs:
             async function requestReviewers(handles) {
               const reviewers = [...new Set(handles)].filter((h) => h !== author);
               if (!reviewers.length) return;
+              await ensureUnmoved();
               try {
                 await github.rest.pulls.requestReviewers({
                   owner, repo, pull_number: pr.number, reviewers,
@@ -661,6 +708,7 @@ jobs:
             //     it labels + requests design owners (above) but does NOT
             //     disable auto-merge or block the merge. ---
             if (codeGated && pr.auto_merge) {
+              await ensureUnmoved();
               try {
                 await github.graphql(
                   `mutation ($id: ID!) {
@@ -702,56 +750,62 @@ jobs:
               : codeHighRisk && codeApproved
                 ? 'Cleared by code-owner approval.'
                 : 'No code review required.';
-            if (
-              (await publishGate(codeGated ? 'pending' : 'success', gateDescription)) === MOVED
-            ) {
-              return MOVED;
-            }
+            await publishGate(codeGated ? 'pending' : 'success', gateDescription);
             // Neutralize any stale "review-required" CHECK RUN left over from the
             // pre-status gate. Such a leftover (conclusion action_required) drags
             // the status rollup to FAILURE even though we now gate via a commit
             // status — so once the status is set, clear the old check-run.
+            let staleRuns = [];
             try {
               const { data } = await github.rest.checks.listForRef({
                 owner, repo, ref: pr.head.sha, check_name: 'review-required', per_page: 100,
               });
-              for (const cr of data.check_runs) {
-                if (cr.conclusion && cr.conclusion !== 'success' && cr.conclusion !== 'neutral') {
-                  await github.rest.checks.update({
-                    owner, repo, check_run_id: cr.id,
-                    conclusion: 'neutral',
-                    output: { title: 'Superseded by review-required status', summary: 'The gate is now a review-required commit status; see that context.' },
-                  });
-                  core.info(`Neutralized stale review-required check-run ${cr.id}.`);
-                }
-              }
+              staleRuns = data.check_runs.filter((cr) =>
+                cr.conclusion && cr.conclusion !== 'success' && cr.conclusion !== 'neutral');
             } catch (e) {
-              core.warning(`Could not neutralize stale check-run: ${e.message}`);
+              core.warning(`Could not list stale check-runs: ${e.message}`);
+            }
+            for (const cr of staleRuns) {
+              await ensureUnmoved();
+              try {
+                await github.rest.checks.update({
+                  owner, repo, check_run_id: cr.id,
+                  conclusion: 'neutral',
+                  output: { title: 'Superseded by review-required status', summary: 'The gate is now a review-required commit status; see that context.' },
+                });
+                core.info(`Neutralized stale review-required check-run ${cr.id}.`);
+              } catch (e) {
+                core.warning(`Could not neutralize stale check-run: ${e.message}`);
+              }
             }
             // A PR retargeted onto the default branch (or into a native stack
             // on it) keeps the scoped status its stacked runs published for
             // this head. Retire it so a stale pending dot does not linger.
             if (scope.governed) {
               const stackedContext = `review-required/stacked-pr-${pr.number}`;
+              let stale = null;
               try {
                 const statuses = await github.paginate(
                   github.rest.repos.listCommitStatusesForRef,
                   { owner, repo, ref: pr.head.sha, per_page: 100 },
                 );
-                const stale = statuses.find((status) => status.context === stackedContext);
-                if (stale?.state === 'pending') {
-                  if (await moved()) return MOVED;
+                stale = statuses.find((status) => status.context === stackedContext);
+              } catch (e) {
+                core.warning(`Could not read ${stackedContext}: ${e.message}`);
+              }
+              if (stale?.state === 'pending') {
+                await ensureUnmoved();
+                try {
                   await github.rest.repos.createCommitStatus({
                     owner, repo, sha: pr.head.sha, context: stackedContext,
                     state: 'success',
                     description: 'Superseded: this PR is now gated by review-required.',
                   });
+                } catch (e) {
+                  core.warning(`Could not retire ${stackedContext}: ${e.message}`);
                 }
-              } catch (e) {
-                core.warning(`Could not retire ${stackedContext}: ${e.message}`);
               }
             }
-            return 'done';
             } // end flagSnapshot
 
   # Anchor the clear/restore chain for every review state that can change the

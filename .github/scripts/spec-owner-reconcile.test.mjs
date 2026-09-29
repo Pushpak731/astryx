@@ -114,6 +114,8 @@ function createHarness({
     timeline: [...timeline],
     calls: [],
     reads: [],
+    // Ordered reads of this pull request and mutations.
+    log: [],
     labels: new Set(labels),
     knownLabels: new Set(labels),
     pr: {
@@ -151,6 +153,7 @@ function createHarness({
       }
       state.pullGets += 1;
       state.reads.push('pull');
+      state.log.push('read:pull');
       onPullGet?.(state.pullGets, state);
       syncLabels();
       // Each read is a fresh object, as from the API; a snapshot never
@@ -174,6 +177,12 @@ function createHarness({
     rest: {
       pulls: {
         get: methods.getPull,
+        // The real list endpoint omits `stack` and `changed_files`.
+        list: async () => ({
+          data: [state.pr, ...state.otherPulls.values()]
+            .filter(pull => pull.state === 'open')
+            .map(({stack: _stack, changed_files: _files, ...listed}) => listed),
+        }),
         listFiles: methods.listFiles,
         listReviews: methods.listReviews,
       },
@@ -191,13 +200,16 @@ function createHarness({
         createLabel: async ({name}) => {
           state.knownLabels.add(name);
           state.calls.push(`create-label:${name}`);
+          state.log.push('write:create-label');
         },
         addLabels: async ({labels: added}) => {
           for (const name of added) state.labels.add(name);
           syncLabels();
           state.calls.push(`add-label:${added.join(',')}`);
+          state.log.push('write:add-label');
         },
         removeLabel: async ({name}) => {
+          state.log.push('write:remove-label');
           if (!state.labels.delete(name)) {
             const error = new Error('Not found');
             error.status = 404;
@@ -213,18 +225,25 @@ function createHarness({
             created_at: '2026-08-30T10:00:30Z',
           });
           state.calls.push('create-comment');
+          state.log.push('write:create-comment');
           return {data: {body}};
         },
       },
       repos: {
         // The real endpoint returns list-shaped pull requests (no `stack`).
+        // Like GitHub, commit association never lists a fork pull request.
         listPullRequestsAssociatedWithCommit: async ({commit_sha: sha}) => ({
           data: [state.pr, ...state.otherPulls.values()]
-            .filter(pull => pull.head.sha === sha)
+            .filter(
+              pull =>
+                pull.head.sha === sha &&
+                pull.head.repo.full_name === repository,
+            )
             .map(({stack: _stack, ...listed}) => listed),
         }),
         listCommitStatusesForRef: methods.listStatuses,
         createCommitStatus: async input => {
+          state.log.push(`write:status:${input.context}`);
           onCreateStatus?.(input, state);
           state.reads.push(`status:${input.context}:${input.state}`);
           const status = {
@@ -247,6 +266,7 @@ function createHarness({
       },
     },
     graphql: async query => {
+      state.log.push('write:graphql');
       if (query.includes('enablePullRequestAutoMerge')) {
         onEnableAutoMerge?.(state);
         state.pr.auto_merge = {merge_method: 'squash'};
@@ -1883,6 +1903,115 @@ describe('spec owner workflow reconciliation', () => {
 
         expect(harness.state.calls).not.toContain('disable-auto-merge');
         expect(harness.state.pr.auto_merge).toEqual({merge_method: 'squash'});
+      });
+    });
+  });
+
+  describe('re-reads the pull request before every mutation', () => {
+    // The initial pending marker follows the run's first read directly, and a
+    // repository label creation is not a pull request mutation.
+    function unguardedWrites(log) {
+      const unguarded = [];
+      let readSinceWrite = false;
+      for (const entry of log) {
+        if (entry === 'read:pull') readSinceWrite = true;
+        else if (entry.startsWith('write:')) {
+          if (entry === 'write:create-label') continue;
+          if (!readSinceWrite) unguarded.push(entry);
+          readSinceWrite = false;
+        }
+      }
+      return unguarded;
+    }
+
+    it.each([
+      ['an approved spec-only change', () => createApprovedHarness(), {}],
+      [
+        'a stacked approval withdrawing gate-owned auto-merge',
+        () =>
+          createApprovedHarness({
+            baseRef: 'feature/lower',
+            labels: ['spec-auto-merge'],
+            autoMerge: {merge_method: 'squash'},
+          }),
+        {action: 'edited'},
+      ],
+      ['a change awaiting owner approval', () => createHarness(), {}],
+      [
+        'a design owner attesting ready',
+        () => createDesignHarness(),
+        {actor: 'ernestt', author: 'ernestt'},
+      ],
+      [
+        'an inexact owner command',
+        () => createHarness(),
+        {
+          eventName: 'issue_comment',
+          comment: {
+            user: {login: 'cixzhang'},
+            body: '/approve-spec',
+            created_at: '2026-08-30T10:00:00Z',
+          },
+        },
+      ],
+    ])('for %s', async (_name, makeHarness, overrides) => {
+      const harness = makeHarness();
+
+      await run(harness, context({runId: 100n, ...overrides}));
+
+      expect(harness.state.log.some(entry => entry.startsWith('write:'))).toBe(
+        true,
+      );
+      expect(unguardedWrites(harness.state.log)).toEqual([]);
+    });
+
+    it('holds a shared required context pending for a fork pull request on the same head', async () => {
+      // Commit association never lists the fork; only the open scan finds it.
+      const harness = createApprovedHarness({
+        associatedPulls: [
+          {
+            number: 6744,
+            state: 'open',
+            merged_at: null,
+            user: {login: 'someone'},
+            head: {sha: head, repo: {full_name: 'someone/astryx'}},
+            base: {
+              sha: '3333333333333333333333333333333333333333',
+              ref: 'main',
+              repo: {full_name: repository, default_branch: 'main'},
+            },
+            stack: null,
+          },
+        ],
+      });
+
+      await run(harness, context({runId: 100n}));
+
+      expect(latestGateStatus(harness.state)).toMatchObject({
+        state: 'pending',
+        description: `Head ${head.slice(0, 7)} is shared with open PR #6744; each needs its own head.`,
+      });
+      expect(harness.state.calls).not.toContain('enable-auto-merge');
+    });
+
+    it('stops before a label change when the base moves on its guard read', async () => {
+      const harness = createHarness({
+        onPullGet: (count, state) => {
+          // Reads 1-4 start the attempt and take the snapshot; read 5 guards
+          // the first mutation after it.
+          if (count === 5) state.pr.base.sha = '6'.repeat(40);
+        },
+      });
+
+      await run(harness, context({runId: 100n}));
+
+      expect(unguardedWrites(harness.state.log)).toEqual([]);
+      expect(
+        harness.state.calls.some(call => call.includes('Reconciling again')),
+      ).toBe(true);
+      expect(latestGateStatus(harness.state)).toMatchObject({
+        state: 'pending',
+        description: expect.stringContaining('engineering owner'),
       });
     });
   });
