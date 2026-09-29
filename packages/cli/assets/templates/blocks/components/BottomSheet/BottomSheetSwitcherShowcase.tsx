@@ -38,10 +38,13 @@ export default function BottomSheetSwitcherShowcase() {
       <BottomSheetSwitcher
         activeSheets={activeSheets}
         onActiveSheetsChange={setActiveSheets}>
+        {/* The first step and its stacked help sheet share height="capped"
+            so the stacked sheet presents at the same height as the covered
+            step behind it (prototype parity pending spec:AST-044 OQ5). */}
         <BottomSheet
           sheetId="overview"
           label="Set up notifications"
-          height="hug">
+          height="capped">
           <Section padding={4}>
             <VStack gap={4}>
               <VStack gap={1}>
@@ -84,7 +87,10 @@ export default function BottomSheetSwitcherShowcase() {
             </VStack>
           </Section>
         </BottomSheet>
-        <BottomSheet sheetId="help" label="How notifications work" height="hug">
+        <BottomSheet
+          sheetId="help"
+          label="How notifications work"
+          height="capped">
           <Section padding={4}>
             <VStack gap={4}>
               <Heading level={3}>How notifications work</Heading>

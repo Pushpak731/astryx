@@ -68,6 +68,10 @@ import type {BottomSheetHeight, BottomSheetSnapPoint} from './BottomSheetPanel';
 // stack-owned and internal; it is not a public theming surface.
 const STACK_VISUAL_DEPTH_LIMIT = 2;
 const STACK_SCALE_STEP = 0.04;
+// PROTOTYPE (spec:AST-044 OQ5): covered sheets also blur and dim with depth.
+// Pending design review; not accepted recede geometry.
+const STACK_BLUR_STEP_PX = 2;
+const STACK_BRIGHTNESS_STEP = 0.08;
 
 function transformForStackDepth(depth: number): string {
   const visualDepth = Math.min(STACK_VISUAL_DEPTH_LIMIT, Math.max(0, depth));
@@ -76,6 +80,21 @@ function transformForStackDepth(depth: number): string {
   }
   const scale = (1 - visualDepth * STACK_SCALE_STEP).toFixed(2);
   return `translateY(calc(${spacingVars['--spacing-2']} * -${visualDepth})) scale(${scale})`;
+}
+
+// PROTOTYPE (spec:AST-044 OQ5): depth-scaled filter for covered levels —
+// d1: blur(2px) brightness(0.92), d2: blur(4px) brightness(0.84). Applied
+// only at depth > 0, where the positioner already carries a transform, so the
+// filter's containing-block effect on fixed descendants adds nothing new; the
+// filtered level is inert either way. Rides the same transition (and the same
+// reduced-motion collapse) as the recede transform — no per-frame JS.
+function filterForStackDepth(depth: number): string {
+  const visualDepth = Math.min(STACK_VISUAL_DEPTH_LIMIT, Math.max(0, depth));
+  if (visualDepth === 0) {
+    return 'none';
+  }
+  const brightness = (1 - visualDepth * STACK_BRIGHTNESS_STEP).toFixed(2);
+  return `blur(${visualDepth * STACK_BLUR_STEP_PX}px) brightness(${brightness})`;
 }
 
 const styles = stylex.create({
@@ -149,9 +168,11 @@ const styles = stylex.create({
   },
   // Stacked-path positioner treatment: recede and return use state plus
   // CSS-native motion only, with no per-frame measurement (spec:AST-044/FR43).
+  // The depth filter (prototype, OQ5) rides the same transition and the same
+  // reduced-motion collapse; willChange stays on transform alone.
   positionerStackMotion: {
     transformOrigin: '50% 0',
-    transitionProperty: 'transform',
+    transitionProperty: 'transform, filter',
     transitionDuration: durationVars['--duration-medium'],
     transitionTimingFunction: easeVars['--ease-standard'],
     willChange: 'transform',
@@ -161,6 +182,9 @@ const styles = stylex.create({
   },
   positionerStackTransform: (transform: string) => ({
     transform,
+  }),
+  positionerStackFilter: (filter: string) => ({
+    filter,
   }),
   positionerStackLayer: (zIndex: number) => ({
     zIndex,
@@ -621,6 +645,9 @@ function SwitcherBottomSheetItem({
         isStackedFlow &&
           stackDepth > 0 &&
           styles.positionerStackTransform(transformForStackDepth(stackDepth)),
+        isStackedFlow &&
+          stackDepth > 0 &&
+          styles.positionerStackFilter(filterForStackDepth(stackDepth)),
         isStackedFlow
           ? styles.positionerStackLayer(stackLayer)
           : isTopSheet && styles.positionerTop,

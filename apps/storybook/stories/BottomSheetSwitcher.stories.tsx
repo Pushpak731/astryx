@@ -281,13 +281,19 @@ function MultiStepPathExample({
       <BottomSheetSwitcher
         activeSheets={activeSheets}
         onActiveSheetsChange={setActiveSheets}>
+        {/* The first step and its stacked help sheet share height="capped"
+            so the stacked sheet presents at the same height as the covered
+            step behind it (prototype parity pending spec:AST-044 OQ5). */}
         <NotificationOverviewSheet
-          height="hug"
+          height="capped"
           onCancel={() => setActiveSheets([])}
           onContinue={() => setActiveSheets(['frequency'])}
           onHelp={() => setActiveSheets(['overview', 'help'])}
         />
-        <BottomSheet sheetId="help" label="How notifications work" height="hug">
+        <BottomSheet
+          sheetId="help"
+          label="How notifications work"
+          height="capped">
           <Section padding={4}>
             <VStack gap={4}>
               <Heading level={3}>How notifications work</Heading>
