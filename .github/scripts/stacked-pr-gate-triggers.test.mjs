@@ -5,7 +5,9 @@
  * @input review-signal.yml and spec-owner-gate.yml, evaluated for simulated
  *   pull request events against main and against another pull request's branch.
  * @output Assertions that both gates start for stacked and main-based pull
- *   requests, re-run on base changes, and ignore title/body edits.
+ *   requests, re-run on base changes, ignore title/body edits, publish only
+ *   from the default branch's copy on dispatch, and that only runs which
+ *   reconcile can cancel another.
  * @position Node regression coverage for the gate workflows' `on`, `if`, and
  *   `concurrency` blocks; the scripts themselves are covered elsewhere.
  */
@@ -22,6 +24,7 @@ const load = name =>
   );
 const reviewSignal = load('review-signal.yml');
 const specOwnerGate = load('spec-owner-gate.yml');
+const reviewClear = load('review-clear.yml');
 
 const REPOSITORY = 'facebook/astryx';
 const RUN_ID = '987654321';
@@ -88,6 +91,10 @@ const FUNCTIONS = {
           .toLowerCase()
           .includes(String(needle ?? '').toLowerCase()),
   fromJSON: value => JSON.parse(value),
+  format: (template, ...args) =>
+    String(template).replace(/\{(\d+)\}/g, (_match, index) =>
+      String(args[Number(index)] ?? ''),
+    ),
 };
 
 function evaluate(source, context) {
@@ -244,6 +251,48 @@ function pullRequestEvent({action, baseRef = 'main', changes, review}) {
       github: {
         event_name: eventName,
         event: payload,
+        // pull_request_target always runs on the default branch.
+        ref: review ? 'refs/pull/42/merge' : 'refs/heads/main',
+        repository: REPOSITORY,
+        run_id: RUN_ID,
+      },
+    },
+  };
+}
+
+function dispatchEvent({pr = '42', ref = 'refs/heads/main'} = {}) {
+  return {
+    event: {name: 'workflow_dispatch'},
+    context: {
+      github: {
+        event_name: 'workflow_dispatch',
+        event: {
+          inputs: {pr},
+          repository: {full_name: REPOSITORY, default_branch: 'main'},
+        },
+        ref,
+        repository: REPOSITORY,
+        run_id: RUN_ID,
+      },
+    },
+  };
+}
+
+function workflowRunEvent(triggeringEvent) {
+  return {
+    event: {name: 'workflow_run', action: 'completed'},
+    context: {
+      github: {
+        event_name: 'workflow_run',
+        event: {
+          action: 'completed',
+          workflow_run: {
+            event: triggeringEvent,
+            head_repository: {full_name: REPOSITORY},
+            head_branch: 'feature/upper',
+          },
+        },
+        ref: 'refs/heads/main',
         repository: REPOSITORY,
         run_id: RUN_ID,
       },
@@ -338,15 +387,17 @@ describe('stacked pull request gate triggers', () => {
       baseRef: 'main',
       changes: retarget(STACKED_BASE),
     });
-    expect(concurrencyGroup(reviewSignal, push)).toBe('review-signal-42');
+    expect(concurrencyGroup(reviewSignal, push)).toBe('review-signal-pr-42');
     // A retarget supersedes a run still classifying the old base.
-    expect(concurrencyGroup(reviewSignal, baseChange)).toBe('review-signal-42');
+    expect(concurrencyGroup(reviewSignal, baseChange)).toBe(
+      'review-signal-pr-42',
+    );
     expect(concurrencyGroup(reviewSignal, edit)).toBe(
-      `review-signal-${RUN_ID}`,
+      `review-signal-run-${RUN_ID}`,
     );
   });
 
-  it('keeps review events and manual dispatch unchanged', () => {
+  it('never lets a review event cancel a classification run', () => {
     const approval = pullRequestEvent({
       action: 'submitted',
       baseRef: STACKED_BASE,
@@ -354,21 +405,65 @@ describe('stacked pull request gate triggers', () => {
     });
     expect(runningJobs(reviewSignal, approval)).toEqual(['review-anchor']);
     expect(runningJobs(specOwnerGate, approval)).toEqual(['reconcile']);
-    expect(concurrencyGroup(reviewSignal, approval)).toBe('review-signal-42');
+    // Its own run scope: the anchor completes (review-clear depends on it)
+    // and a retarget's classification in the PR group survives it.
+    expect(concurrencyGroup(reviewSignal, approval)).toBe(
+      `review-signal-run-${RUN_ID}`,
+    );
+  });
 
-    const dispatch = {
-      event: {name: 'workflow_dispatch'},
-      context: {
-        github: {
-          event_name: 'workflow_dispatch',
-          event: {inputs: {pr: '42'}},
-          repository: REPOSITORY,
-          run_id: RUN_ID,
-        },
-      },
-    };
-    expect(runningJobs(reviewSignal, dispatch)).toEqual(['flag']);
-    expect(runningJobs(specOwnerGate, dispatch)).toEqual(['reconcile']);
-    expect(concurrencyGroup(reviewSignal, dispatch)).toBe('review-signal-42');
+  it('only groups runs that reclassify the pull request', () => {
+    // Every member of the PR group runs the flag job on the live PR.
+    for (const event of [
+      pullRequestEvent({action: 'synchronize', baseRef: STACKED_BASE}),
+      pullRequestEvent({
+        action: 'edited',
+        baseRef: 'main',
+        changes: retarget(STACKED_BASE),
+      }),
+      dispatchEvent(),
+    ]) {
+      expect(concurrencyGroup(reviewSignal, event)).toBe('review-signal-pr-42');
+      expect(runningJobs(reviewSignal, event)).toEqual(['flag']);
+    }
+    // The backfill-all dispatch is never cancelled by a single-PR run.
+    const backfill = dispatchEvent({pr: ''});
+    expect(concurrencyGroup(reviewSignal, backfill)).toBe(
+      `review-signal-run-${RUN_ID}`,
+    );
+    expect(runningJobs(reviewSignal, backfill)).toEqual(['flag']);
+  });
+
+  it('publishes on dispatch only from the default branch copy', () => {
+    const fromBranch = dispatchEvent({ref: 'refs/heads/feature/upper'});
+    expect(runningJobs(reviewSignal, fromBranch)).toEqual([]);
+    expect(runningJobs(specOwnerGate, fromBranch)).toEqual([]);
+    // A skipped dispatch must not cancel a classification either.
+    expect(concurrencyGroup(reviewSignal, fromBranch)).toBe(
+      `review-signal-run-${RUN_ID}`,
+    );
+
+    const fromDefault = dispatchEvent();
+    expect(runningJobs(reviewSignal, fromDefault)).toEqual(['flag']);
+    expect(runningJobs(specOwnerGate, fromDefault)).toEqual(['reconcile']);
+  });
+
+  it('keeps skipped review-clear runs from cancelling a reconciliation', () => {
+    const afterReview = workflowRunEvent('pull_request_review');
+    expect(runningJobs(reviewClear, afterReview)).toEqual(['clear']);
+    expect(concurrencyGroup(reviewClear, afterReview)).toBe(
+      `review-clear-${REPOSITORY}-feature/upper`,
+    );
+
+    for (const triggeringEvent of [
+      'pull_request_target',
+      'workflow_dispatch',
+    ]) {
+      const afterFlag = workflowRunEvent(triggeringEvent);
+      expect(runningJobs(reviewClear, afterFlag)).toEqual([]);
+      expect(concurrencyGroup(reviewClear, afterFlag)).toBe(
+        `review-clear-run-${RUN_ID}`,
+      );
+    }
   });
 });

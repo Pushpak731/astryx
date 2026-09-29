@@ -57,10 +57,15 @@
 # vars.DESIGNOWNERS) — no checkout and no execution of PR-controlled code.
 # Do not add checkout or build steps here.
 #
-# Stacked PRs (based on another PR's branch) are flagged too. GitHub always runs
-# pull_request_target from the default branch, with GITHUB_SHA at its tip, so a
-# non-default base cannot choose the workflow or helper code. A base change
-# re-flags the PR against its new base; title/body edits do not.
+# Stacked PRs (based on another PR's branch) are flagged too, against their own
+# base. GitHub always runs pull_request_target from the default branch, with
+# GITHUB_SHA at its tip, so a non-default base cannot choose the workflow or
+# helper code; manual dispatch is honored only from the default branch. A base
+# change re-flags the PR; title/body edits do not. Commit statuses are shared by
+# every PR with the same head, so the required "review-required" context is
+# published only for a PR the default branch's protection governs (it targets
+# the default branch, or is a rung of a native stack on it). Any other PR gets a
+# non-required "review-required/stacked-pr-<number>" context instead.
 
 name: Review signal
 
@@ -95,11 +100,12 @@ on:
 permissions: {}
 
 concurrency:
-  # One group per PR for the event/single-dispatch paths; a run-scoped group for
-  # the backfill-all dispatch so it is never cancelled by an unrelated re-run.
-  # A title/body edit never flags, so it is run-scoped too: it must not cancel
-  # an in-flight flag run for the same PR.
-  group: review-signal-${{ (github.event.action == 'edited' && !github.event.changes.base) && github.run_id || github.event.pull_request.number || github.event.inputs.pr || github.run_id }}
+  # Only runs that classify a PR share its group, so every run that cancels
+  # another reclassifies the live PR itself. Everything else is run-scoped and
+  # never cancels a classification: review events (their anchor must complete
+  # for review-clear), title/body edits, the backfill-all dispatch, and a
+  # dispatch from a ref other than the default branch.
+  group: review-signal-${{ ((github.event_name == 'pull_request_target' && (github.event.action != 'edited' || github.event.changes.base)) || (github.event_name == 'workflow_dispatch' && github.event.inputs.pr && github.ref == format('refs/heads/{0}', github.event.repository.default_branch))) && format('pr-{0}', github.event.pull_request.number || github.event.inputs.pr) || format('run-{0}', github.run_id) }}
   cancel-in-progress: true
 
 env:
@@ -112,10 +118,13 @@ jobs:
   # Detect signals from changed paths + author; label, request reviewers, gate.
   # ---------------------------------------------------------------------------
   flag:
+    # A dispatch runs the workflow file from the selected ref; only the default
+    # branch's copy may publish the gate.
     if: >-
       (github.event_name == 'pull_request_target' &&
        (github.event.action != 'edited' || github.event.changes.base != null))
-      || github.event_name == 'workflow_dispatch'
+      || (github.event_name == 'workflow_dispatch' &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     name: Flag review signals
     runs-on: ubuntu-slim
     permissions:
@@ -140,48 +149,134 @@ jobs:
             const DESIGN = process.env.DESIGN_LABEL;
             const COMMUNITY = process.env.COMMUNITY_LABEL;
 
-            // Resolve which PR(s) to flag. On a PR event we get the payload PR.
-            // On manual dispatch we take the `pr` input (one PR), or re-flag
-            // every open PR when it's blank (backfill / mass recovery).
-            let prs;
+            // A pull request that moves while it is classified is read and
+            // classified again, at most this many times, before the run fails.
+            const MAX_ATTEMPTS = 3;
+            const MOVED = 'moved';
+
+            // Resolve which PR(s) to flag: the payload PR on a PR event, the
+            // `pr` input on manual dispatch, or every open PR when it's blank
+            // (backfill / mass recovery). Only numbers are taken here. Every
+            // attempt below classifies the live PR: an event payload is a
+            // snapshot from when GitHub queued the event, and the list endpoint
+            // omits changed_files and stack.
+            let numbers;
             if (context.eventName === 'workflow_dispatch') {
               const num = (context.payload.inputs.pr || '').trim();
               if (num) {
-                const { data } = await github.rest.pulls.get({
-                  owner, repo, pull_number: Number(num),
-                });
-                prs = [data];
+                numbers = [Number(num)];
               } else {
-                prs = await github.paginate(github.rest.pulls.list, {
+                const open = await github.paginate(github.rest.pulls.list, {
                   owner, repo, state: 'open', per_page: 100,
                 });
-                core.info(`Backfill: re-flagging ${prs.length} open PR(s).`);
+                numbers = open.map((pr) => pr.number);
+                core.info(`Backfill: re-flagging ${numbers.length} open PR(s).`);
               }
             } else {
-              // The payload is a snapshot from when GitHub queued the event. A
-              // push or retarget can land before this job starts (a base change
-              // between the two made the file count below disagree with a stale
-              // payload), so classify the live PR. A base change queues its own
-              // run, so a mid-run retarget still fails closed and re-flags.
-              const { data } = await github.rest.pulls.get({
-                owner, repo, pull_number: context.payload.pull_request.number,
-              });
-              prs = [data];
+              numbers = [context.payload.pull_request.number];
+            }
+
+            // Match the trusted workflow version: an older PR base can predate
+            // this helper even though the running workflow requires it.
+            let reviewDecisionLoad = null;
+            function loadReviewDecision() {
+              reviewDecisionLoad ??= (async () => {
+                const { data: reviewDecisionFile } = await github.rest.repos.getContent({
+                  owner, repo, ref: context.sha,
+                  path: '.github/scripts/review-signal-decision.cjs',
+                });
+                const reviewDecisionSource = Buffer.from(
+                  reviewDecisionFile.content,
+                  'base64',
+                ).toString('utf8');
+                const reviewDecisionModule = { exports: {} };
+                new Function('module', 'exports', 'require', reviewDecisionSource)(
+                  reviewDecisionModule,
+                  reviewDecisionModule.exports,
+                  () => { throw new Error('review-signal-decision.cjs must stay dependency-free'); },
+                );
+                return reviewDecisionModule.exports;
+              })();
+              return reviewDecisionLoad;
             }
 
             let hadError = false;
-            for (const pr of prs) {
+            for (const number of numbers) {
               try {
-                await flagOne(pr);
+                await flagOne(number);
               } catch (e) {
                 hadError = true;
-                core.warning(`Failed to flag PR #${pr.number}: ${e.message}`);
+                core.warning(`Failed to flag PR #${number}: ${e.message}`);
               }
             }
             if (hadError) core.setFailed('One or more PRs failed to flag; see warnings.');
 
+            async function flagOne(number) {
+              for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+                const { data: pr } = await github.rest.pulls.get({
+                  owner, repo, pull_number: number,
+                });
+                if (pr.state !== 'open') {
+                  core.info(`PR #${number} is ${pr.state}; nothing to flag.`);
+                  return;
+                }
+                if ((await flagSnapshot(pr)) !== MOVED) return;
+                core.info(`PR #${number} moved while it was classified (attempt ${attempt} of ${MAX_ATTEMPTS}); reading it again.`);
+              }
+              throw new Error(`PR #${number} kept moving while it was classified; refusing to publish a decision for a head or base that is still changing.`);
+            }
+
             // ================= per-PR detection + routing =================
-            async function flagOne(pr) {
+            // Classify one snapshot of a live PR. Returns MOVED, without
+            // publishing, when the PR's head, base, or stack changed after the
+            // snapshot was read; every write re-reads the PR first.
+            async function flagSnapshot(pr) {
+            const reviewDecision = await loadReviewDecision();
+            // Commit statuses are shared by every PR with this head. Only a PR
+            // the default branch's protection governs publishes the required
+            // context; any other PR publishes one scoped to its own number.
+            const scope = reviewDecision.gateScope(pr);
+            const GATE = reviewDecision.gateContext('review-required', pr);
+            async function moved() {
+              const { data: live } = await github.rest.pulls.get({
+                owner, repo, pull_number: pr.number,
+              });
+              return !reviewDecision.samePullIdentity(pr, live);
+            }
+            // The one path that writes the gate status. A required context is
+            // shared by every PR with this head, so when another open PR that
+            // also reads it shares the head, no single decision can be right
+            // for both: publish pending until the heads differ.
+            async function publishGate(state, description) {
+              let finalState = state;
+              let finalDescription = description;
+              if (scope.governed) {
+                const associated = await github.paginate(
+                  github.rest.repos.listPullRequestsAssociatedWithCommit,
+                  { owner, repo, commit_sha: pr.head.sha, per_page: 100 },
+                );
+                const others = [];
+                for (const other of associated) {
+                  if (other.number === pr.number || other.state !== 'open' || other.head?.sha !== pr.head.sha) continue;
+                  const { data } = await github.rest.pulls.get({
+                    owner, repo, pull_number: other.number,
+                  });
+                  others.push(data);
+                }
+                const siblings = reviewDecision.governedSiblings(pr, others);
+                if (siblings.length) {
+                  finalState = 'pending';
+                  finalDescription = `Head is shared with open PR ${siblings.map((n) => `#${n}`).join(', ')}; each needs its own head.`.slice(0, 140);
+                }
+              }
+              if (await moved()) return MOVED;
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha: pr.head.sha,
+                context: GATE, state: finalState, description: finalDescription,
+              });
+              core.info(`${GATE} status: ${finalState}`);
+              return finalState;
+            }
             const author = pr.user.login.toLowerCase();
             // Bots (Dependabot, github-actions, etc.) are our own automation,
             // not community contributors, and their PRs (dep bumps, chores) are
@@ -222,6 +317,7 @@ jobs:
             // gate/community labels, and stop.
             if (authorIsBot) {
               core.info(`@${author} is a bot — exempt from review gates.`);
+              if (await moved()) return MOVED;
               const current = pr.labels.map((l) => l.name);
               for (const name of [CODE, DESIGN, COMMUNITY]) {
                 if (current.includes(name)) {
@@ -234,37 +330,20 @@ jobs:
                   }
                 }
               }
-              await github.rest.repos.createCommitStatus({
-                owner, repo, sha: pr.head.sha,
-                context: 'review-required', state: 'success',
-                description: 'Automated (bot) PR — exempt from review gates.',
-              });
-              return;
+              return publishGate(
+                'success',
+                'Automated (bot) PR — exempt from review gates.',
+              );
             }
-
-            // Match the trusted workflow version: an older PR base can predate
-            // this helper even though the running workflow requires it.
-            const { data: reviewDecisionFile } = await github.rest.repos.getContent({
-              owner, repo, ref: context.sha,
-              path: '.github/scripts/review-signal-decision.cjs',
-            });
-            const reviewDecisionSource = Buffer.from(
-              reviewDecisionFile.content,
-              'base64',
-            ).toString('utf8');
-            const reviewDecisionModule = { exports: {} };
-            new Function('module', 'exports', 'require', reviewDecisionSource)(
-              reviewDecisionModule,
-              reviewDecisionModule.exports,
-              () => { throw new Error('review-signal-decision.cjs must stay dependency-free'); },
-            );
-            const reviewDecision = reviewDecisionModule.exports;
 
             // --- Changed files. ---
             const allFiles = await github.paginate(github.rest.pulls.listFiles, {
               owner, repo, pull_number: pr.number, per_page: 100,
             });
             if (allFiles.length !== pr.changed_files) {
+              // A push or retarget between the two reads changes the count;
+              // otherwise the listing is incomplete and the gate fails closed.
+              if (await moved()) return MOVED;
               throw new Error(
                 `GitHub returned ${allFiles.length} of ${pr.changed_files} changed files; refusing to classify an incomplete PR.`,
               );
@@ -370,10 +449,7 @@ jobs:
             let visualClassification = null;
             if (coreChange || designReasons.length === 0) {
               try {
-                const targetsDefaultBranch =
-                  typeof pr.base.ref === 'string' &&
-                  pr.base.ref === pr.base.repo?.default_branch;
-                const classifierRef = targetsDefaultBranch ? pr.base.sha : context.sha;
+                const classifierRef = scope.targetsDefaultBranch ? pr.base.sha : context.sha;
                 const { data: libFile } = await github.rest.repos.getContent({
                   owner, repo, ref: classifierRef,
                   path: '.github/scripts/lib/classify-visual.js',
@@ -389,6 +465,13 @@ jobs:
                   { owner, repo, pull_number: pr.number,
                     headers: { accept: 'application/vnd.github.diff' } },
                 );
+                // The diff and the file list are separate reads. A diff for
+                // other files means the PR moved (classify it again) or GitHub
+                // served inconsistent data (fail closed).
+                if (!reviewDecision.diffMatchesFiles(String(diff), allFiles)) {
+                  if (await moved()) return MOVED;
+                  throw new Error('the diff does not describe the changed-file list');
+                }
                 const sources = {};
                 const coreRuntimeFiles = files.filter((file) =>
                   isCoreRuntime(file.filename) ||
@@ -510,6 +593,10 @@ jobs:
             const designGated = designAffecting && !designApproved;
             core.info(`approvals: code=${codeApproved} design=${designApproved} → codeGated=${codeGated} designGated=${designGated}`);
 
+            // Labels, reviewer requests, and auto-merge all act on this snapshot's
+            // decision, so re-read the PR before any of them.
+            if (await moved()) return MOVED;
+
             // --- Apply labels. ---
             const current = pr.labels.map((l) => l.name);
             const toAdd = [];
@@ -615,15 +702,11 @@ jobs:
               : codeHighRisk && codeApproved
                 ? 'Cleared by code-owner approval.'
                 : 'No code review required.';
-            await github.rest.repos.createCommitStatus({
-              owner,
-              repo,
-              sha: pr.head.sha,
-              context: 'review-required',
-              state: codeGated ? 'pending' : 'success',
-              description: gateDescription,
-            });
-            core.info(`review-required status: ${codeGated ? 'pending' : 'success'}`);
+            if (
+              (await publishGate(codeGated ? 'pending' : 'success', gateDescription)) === MOVED
+            ) {
+              return MOVED;
+            }
             // Neutralize any stale "review-required" CHECK RUN left over from the
             // pre-status gate. Such a leftover (conclusion action_required) drags
             // the status rollup to FAILURE even though we now gate via a commit
@@ -645,7 +728,31 @@ jobs:
             } catch (e) {
               core.warning(`Could not neutralize stale check-run: ${e.message}`);
             }
-            } // end flagOne
+            // A PR retargeted onto the default branch (or into a native stack
+            // on it) keeps the scoped status its stacked runs published for
+            // this head. Retire it so a stale pending dot does not linger.
+            if (scope.governed) {
+              const stackedContext = `review-required/stacked-pr-${pr.number}`;
+              try {
+                const statuses = await github.paginate(
+                  github.rest.repos.listCommitStatusesForRef,
+                  { owner, repo, ref: pr.head.sha, per_page: 100 },
+                );
+                const stale = statuses.find((status) => status.context === stackedContext);
+                if (stale?.state === 'pending') {
+                  if (await moved()) return MOVED;
+                  await github.rest.repos.createCommitStatus({
+                    owner, repo, sha: pr.head.sha, context: stackedContext,
+                    state: 'success',
+                    description: 'Superseded: this PR is now gated by review-required.',
+                  });
+                }
+              } catch (e) {
+                core.warning(`Could not retire ${stackedContext}: ${e.message}`);
+              }
+            }
+            return 'done';
+            } // end flagSnapshot
 
   # Anchor the clear/restore chain for every review state that can change the
   # effective exact-head engineering approval.

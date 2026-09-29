@@ -145,7 +145,8 @@ internal contributors' PRs. Owners still self-serve their own domain.
    ┌─────────────────────────────────────────────┐
    │ review-clear.yml  (workflow_run, base token) │  ← works for fork PRs
    └─────────────────────────────────────────────┘
-     resolve the PR by the run's head_branch (head_sha points at main here)
+     resolve the PR by the run's exact head repository, branch, and commit
+     (several open PRs on that head: restore only, never clear)
      entitled CODEOWNER approved?
        → drop needs:code-review · status → success 🟢 · neutralize stale check
 
@@ -158,18 +159,53 @@ internal contributors' PRs. Owners still self-serve their own domain.
 ## Stacked pull requests
 
 Both gates also run for a pull request whose base is another pull request's
-branch, and each evaluates the diff against the pull request's current base.
+branch, and each decides the diff against the pull request's current base.
 Changing the base re-runs both gates; title and body edits do not. Approval
 still counts only for the exact current head.
 
-`pull_request_target` always runs the default branch's workflow file, with
-`GITHUB_SHA` at the default branch tip, so a stacked base never chooses the
-workflow. The workflows also never execute helpers from a stacked base: the
-visual classifier and the review-clear decision helper load from the base
-commit only when the base is the default branch, and otherwise from the
-workflow commit. The spec gate enables auto-merge only for pull requests that
-target the default branch, and withdraws auto-merge it enabled when a pull
-request is retargeted elsewhere.
+Commit statuses are keyed by commit, not by pull request, so every pull request
+with the same head shares them. The required contexts (`review-required`,
+`spec-owner-approval`) are therefore published only for a pull request the
+default branch's protection governs: one that targets the default branch, or a
+rung of a native stack whose trunk is the default branch (GitHub applies the
+trunk's required checks to every rung). Any other stacked pull request gets
+non-required `review-required/stacked-pr-<number>` and
+`spec-owner-approval/stacked-pr-<number>` contexts, and its ready attestation is
+scoped the same way. When a pull request moves under the default branch's
+protection, its gates publish the required contexts and retire its pending
+scoped ones. If two open pull requests that both read the required contexts
+share a head, neither gate can decide for both: the context stays `pending`
+("shared with open PR #…") until the heads differ.
+
+Each run classifies the live pull request and re-reads it before every status
+write or other side effect. A moved head, base, base commit, or stack starts the
+classification over (at most three attempts, then the run fails without a
+decision). The file list and the diff are checked against each other.
+
+`pull_request_target` and `workflow_run` always run the default branch's
+workflow file, and a manual dispatch publishes only from the default branch's
+copy. The workflows never execute helpers from a stacked base: review-signal
+and review-clear load their decision helper from the workflow commit, and the
+visual classifier loads from the base commit only when the base is the default
+branch. Only runs that reclassify a pull request share its cancellation group,
+so review events, title/body edits, and non-review `workflow_run` completions
+cannot cancel a classification in progress. Review-clear identifies the reviewed
+pull request by the exact head repository, branch, and commit; when that head
+backs several open pull requests, it restores withdrawn gates but never clears
+one.
+
+The spec gate enables auto-merge only for a pull request that targets the
+default branch directly and is not part of a stack. It withdraws auto-merge it
+enabled from any other pull request before publishing, and re-reads the pull
+request after enabling: `expectedHeadOid` pins the head but not the base, so a
+retarget can still land between the last read and the enable, and the re-read
+(plus the retarget's own run) withdraws it.
+
+After linking existing pull requests into a native stack without changing their
+bases, re-run both gates for each rung, because GitHub sends no pull request
+event for that:
+`gh workflow run review-signal.yml -f pr=<n>` and
+`gh workflow run spec-owner-gate.yml -f pr=<n> -f backfill=true`.
 
 ## Enforcement
 

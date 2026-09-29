@@ -31,20 +31,16 @@ const head2 = '2222222222222222222222222222222222222222';
 const head3 = '3333333333333333333333333333333333333333';
 const baseSha = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const workflowSha = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
-// Stands in for a helper pushed to another PR's branch; it would clear any gate.
-const untrustedHelper = [
-  'globalThis.__untrustedHelperRan = true;',
-  'module.exports = {',
-  '  resolveReviewApprovals: () => ({codeApproved: true, codeWithdrawn: false}),',
-  '};',
-].join('\n');
+const REPOSITORY = 'facebook/astryx';
+const BRANCH = 'feature';
+const HELPER = '.github/scripts/review-signal-decision.cjs';
 const review = (state, commitId = head2) => ({
   user: {login: 'engineer'},
   state,
   commit_id: commitId,
 });
-const gateStatus = (state, description) => ({
-  context: 'review-required',
+const gateStatus = (state, description, context = 'review-required') => ({
+  context,
   creator: {login: 'github-actions[bot]'},
   description,
   state,
@@ -56,59 +52,102 @@ const pendingGate = gateStatus(
 const clearedGate = gateStatus('success', 'Cleared by code-owner approval.');
 const ungatedSuccess = gateStatus('success', 'No code review required.');
 
+/** A pull request as the detail endpoint returns it. */
+function pull({
+  number = 17,
+  headRepo = REPOSITORY,
+  headRef = BRANCH,
+  headSha = head2,
+  baseRef = 'main',
+  stack = null,
+  labels = ['needs:code-review'],
+  reviews = [],
+} = {}) {
+  return {
+    number,
+    state: 'open',
+    merged_at: null,
+    head: {sha: headSha, ref: headRef, repo: {full_name: headRepo}},
+    base: {
+      sha: baseSha,
+      ref: baseRef,
+      repo: {full_name: REPOSITORY, default_branch: 'main'},
+    },
+    stack,
+    labels: labels.map(name => ({name})),
+    reviews,
+  };
+}
+
+/** The list endpoints omit stack (and review data is not part of a PR). */
+const listed = ({stack: _stack, reviews: _reviews, ...rest}) => rest;
+
 function harness(
   reviews,
   {
-    baseRef = 'main',
-    labels = ['needs:code-review'],
+    pulls,
     moveAfterFirstRead = false,
+    onPullGet,
     statusFailure = false,
     statuses = [pendingGate],
+    runHead = {repo: REPOSITORY, owner: 'facebook', branch: BRANCH, sha: head2},
+    ...single
   } = {},
 ) {
   const calls = [];
-  let pullReads = 0;
-  const full = {
-    number: 17,
-    head: {sha: head2},
-    base: {sha: baseSha, ref: baseRef, repo: {default_branch: 'main'}},
-    labels: labels.map(name => ({name})),
-  };
-  const methods = {
-    listCommitStatusesForRef: async () => ({data: statuses}),
-    listReviews: async () => ({data: reviews}),
-  };
+  const byNumber = new Map(
+    (pulls ?? [pull({...single, reviews})]).map(candidate => [
+      candidate.number,
+      structuredClone(candidate),
+    ]),
+  );
+  const reads = new Map();
   const github = {
     paginate: async (method, options) => (await method(options)).data,
     rest: {
       pulls: {
-        get: async () => {
-          pullReads += 1;
+        get: async ({pull_number: number}) => {
+          const count = (reads.get(number) ?? 0) + 1;
+          reads.set(number, count);
+          const current = byNumber.get(number);
+          if (moveAfterFirstRead && count > 1) current.head.sha = head3;
+          onPullGet?.(number, count, current);
+          const {reviews: _reviews, ...detail} = structuredClone(current);
+          return {data: detail};
+        },
+        // Mirrors GitHub's `head` filter: owner and branch only.
+        list: async ({head}) => {
+          calls.push(`list:${head}`);
           return {
-            data:
-              moveAfterFirstRead && pullReads > 1
-                ? {...full, head: {sha: head3}}
-                : full,
+            data: [...byNumber.values()]
+              .filter(
+                candidate =>
+                  `${candidate.head.repo.full_name.split('/')[0]}:${candidate.head.ref}` ===
+                  head,
+              )
+              .map(listed),
           };
         },
-        list: async () => ({data: []}),
-        listReviews: methods.listReviews,
+        listReviews: async ({pull_number: number}) => ({
+          data: byNumber.get(number).reviews,
+        }),
       },
       repos: {
         getContent: async ({ref, path: filePath}) => {
           calls.push(`read:${ref}:${filePath}`);
-          const source =
-            baseRef !== 'main' && ref === baseSha
-              ? untrustedHelper
-              : helperSource;
           return {
             data: {
               type: 'file',
-              content: Buffer.from(source).toString('base64'),
+              content: Buffer.from(helperSource).toString('base64'),
             },
           };
         },
-        listCommitStatusesForRef: methods.listCommitStatusesForRef,
+        listCommitStatusesForRef: async () => ({data: statuses}),
+        listPullRequestsAssociatedWithCommit: async ({commit_sha: sha}) => ({
+          data: [...byNumber.values()]
+            .filter(candidate => candidate.head.sha === sha)
+            .map(listed),
+        }),
         createCommitStatus: async input => {
           calls.push({type: 'status-attempt', input});
           if (statusFailure) throw new Error('persistent status failure');
@@ -130,7 +169,13 @@ function harness(
     sha: workflowSha,
     payload: {
       workflow_run: {
-        pull_requests: [{number: 17}],
+        event: 'pull_request_review',
+        head_repository: {
+          full_name: runHead.repo,
+          owner: {login: runHead.owner},
+        },
+        head_branch: runHead.branch,
+        head_sha: runHead.sha,
       },
     },
   };
@@ -143,13 +188,7 @@ function harness(
 }
 
 async function run(h) {
-  delete globalThis.__untrustedHelperRan;
-  try {
-    await execute(h.github, h.context, h.core, h.processValue, Buffer);
-  } finally {
-    h.untrustedHelperRan = globalThis.__untrustedHelperRan === true;
-    delete globalThis.__untrustedHelperRan;
-  }
+  await execute(h.github, h.context, h.core, h.processValue, Buffer);
 }
 
 function mutations(calls) {
@@ -165,9 +204,16 @@ describe('review-clear exact-head workflow', () => {
     await run(h);
 
     expect(mutations(h.calls)).toEqual([]);
-    expect(h.calls).toContain(
-      `read:${baseSha}:.github/scripts/review-signal-decision.cjs`,
-    );
+  });
+
+  it('loads the decision helper only from the trusted workflow SHA', async () => {
+    const h = harness([review('APPROVED')]);
+
+    await run(h);
+
+    expect(h.calls.filter(call => String(call).startsWith('read:'))).toEqual([
+      `read:${workflowSha}:${HELPER}`,
+    ]);
   });
 
   it('does not create a gate for a head that review-signal marked ungated', async () => {
@@ -230,9 +276,6 @@ describe('review-clear exact-head workflow', () => {
     const labelIndex = h.calls.findIndex(call => call?.type === 'add-label');
     expect(pendingIndex).toBeGreaterThan(-1);
     expect(labelIndex).toBeGreaterThan(pendingIndex);
-    expect(h.calls).toContainEqual(
-      expect.objectContaining({type: 'add-label'}),
-    );
     expect(h.calls).toContainEqual({
       type: 'status',
       input: expect.objectContaining({
@@ -317,38 +360,191 @@ describe('review-clear exact-head workflow', () => {
     },
   );
 
-  describe('on a PR based on another PR branch', () => {
-    it('loads the decision helper from the trusted workflow SHA', async () => {
-      const h = harness([review('APPROVED', head1)], {
-        baseRef: 'feature/lower',
+  describe('identifying the reviewed pull request', () => {
+    it('ignores another repository whose branch has the same name', async () => {
+      const h = harness([], {
+        pulls: [
+          pull({reviews: [review('APPROVED')]}),
+          pull({
+            number: 18,
+            headRepo: 'facebook/astryx-mirror',
+            headSha: head1,
+            reviews: [review('APPROVED', head1)],
+          }),
+        ],
       });
 
       await run(h);
 
-      expect(h.untrustedHelperRan).toBe(false);
-      expect(h.calls).toContain(
-        `read:${workflowSha}:.github/scripts/review-signal-decision.cjs`,
+      expect(h.calls).toContain('list:facebook:feature');
+      expect(mutations(h.calls)).toContainEqual(
+        expect.objectContaining({
+          type: 'remove-label',
+          input: expect.objectContaining({issue_number: 17}),
+        }),
       );
-      expect(h.calls).not.toContain(
-        `read:${baseSha}:.github/scripts/review-signal-decision.cjs`,
-      );
+      expect(
+        mutations(h.calls).some(call => call.input.issue_number === 18),
+      ).toBe(false);
+    });
+
+    it('does nothing when no open PR still has the reviewed head', async () => {
+      const h = harness([review('APPROVED')], {
+        runHead: {
+          repo: REPOSITORY,
+          owner: 'facebook',
+          branch: BRANCH,
+          sha: head1,
+        },
+      });
+
+      await run(h);
+
       expect(mutations(h.calls)).toEqual([]);
     });
 
-    it('clears an owned stacked gate only for exact-head approval', async () => {
-      const h = harness([review('APPROVED')], {baseRef: 'feature/lower'});
+    it('never clears when the reviewed head backs several open PRs', async () => {
+      const h = harness([], {
+        pulls: [
+          pull({reviews: [review('APPROVED')]}),
+          pull({
+            number: 18,
+            baseRef: 'feature/lower',
+            reviews: [review('APPROVED')],
+          }),
+        ],
+        statuses: [
+          pendingGate,
+          gateStatus(
+            'pending',
+            'Waiting on code review: core change',
+            'review-required/stacked-pr-18',
+          ),
+        ],
+      });
 
       await run(h);
 
-      expect(h.untrustedHelperRan).toBe(false);
-      expect(h.calls).toContainEqual({
+      expect(mutations(h.calls)).toEqual([]);
+      expect(h.calls).toContain(
+        `warning:Head ${head2.slice(0, 7)} backs open PRs #17, #18; restoring gates only, never clearing.`,
+      );
+    });
+
+    it('still restores a withdrawn gate when the head backs several PRs', async () => {
+      const h = harness([], {
+        pulls: [
+          pull({
+            labels: [],
+            reviews: [review('APPROVED'), review('CHANGES_REQUESTED')],
+          }),
+          pull({number: 18, baseRef: 'feature/lower', labels: []}),
+        ],
+        statuses: [clearedGate],
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([
+        {
+          type: 'status',
+          input: expect.objectContaining({
+            context: 'review-required',
+            state: 'pending',
+          }),
+        },
+        {
+          type: 'add-label',
+          input: expect.objectContaining({issue_number: 17}),
+        },
+      ]);
+    });
+  });
+
+  describe('scope of the gate a pull request owns', () => {
+    it('clears only the scoped context of a manually stacked PR', async () => {
+      const scoped = 'review-required/stacked-pr-17';
+      const h = harness([review('APPROVED')], {
+        baseRef: 'feature/lower',
+        statuses: [
+          gateStatus('pending', 'Waiting on code review: core change', scoped),
+        ],
+      });
+
+      await run(h);
+
+      const writes = mutations(h.calls).filter(call => call.type === 'status');
+      expect(writes).toEqual([
+        {
+          type: 'status',
+          input: expect.objectContaining({
+            context: scoped,
+            state: 'success',
+            description: 'Cleared by code-owner approval.',
+          }),
+        },
+      ]);
+    });
+
+    it('does not treat the required context as ownership of a stacked gate', async () => {
+      const h = harness([review('APPROVED')], {
+        baseRef: 'feature/lower',
+        labels: [],
+        statuses: [pendingGate],
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([]);
+    });
+
+    it('clears the required context of a native stack rung on main', async () => {
+      const h = harness([review('APPROVED')], {
+        baseRef: 'feature/lower',
+        stack: {base: {ref: 'main', sha: head3}},
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toContainEqual({
         type: 'status',
         input: expect.objectContaining({
-          sha: head2,
+          context: 'review-required',
           state: 'success',
-          description: 'Cleared by code-owner approval.',
         }),
       });
+    });
+
+    it('does not clear a required context another governed PR shares', async () => {
+      // A fork PR with the same commit is not a candidate for this review run,
+      // but it reads the same required context.
+      const h = harness([], {
+        pulls: [
+          pull({reviews: [review('APPROVED')]}),
+          pull({number: 18, headRepo: 'someone/astryx', headRef: 'copy'}),
+        ],
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([]);
+      expect(h.calls).toContain(
+        'info:PR #17: head is shared with open PR #18; not clearing review-required.',
+      );
+    });
+
+    it('re-reads and retries when the base moves before the mutation', async () => {
+      const h = harness([review('APPROVED')], {
+        onPullGet: (_number, count, current) => {
+          if (count === 2) current.base.sha = head3;
+        },
+      });
+
+      await run(h);
+
+      expect(
+        mutations(h.calls).filter(call => call.type === 'status'),
+      ).toHaveLength(1);
     });
   });
 });
