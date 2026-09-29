@@ -51,7 +51,7 @@ export const docs = {
           props: {
             sheetId: 'details',
             label: 'Setup details',
-            height: 'capped',
+            height: 'hug',
           },
           children: {
             __element: 'Section',
@@ -84,7 +84,7 @@ export const docs = {
           props: {
             sheetId: 'details-help',
             label: 'About setup details',
-            height: 'capped',
+            height: 'hug',
           },
           children: {
             __element: 'Section',
@@ -281,7 +281,7 @@ export const docs = {
   <BottomSheetSwitcher
     activeSheets={activeSheets}
     onActiveSheetsChange={setActiveSheets}>
-    <BottomSheet sheetId="details" label="Details" height="capped">
+    <BottomSheet sheetId="details" label="Details" height="hug">
       <SetupDetails />
       <Button
         label="What are these details?"
@@ -290,9 +290,9 @@ export const docs = {
       />
       <Button label="Continue" onClick={() => setActiveSheets(['preferences'])} />
     </BottomSheet>
-    {/* Same height as Details: the stacked sheet presents at the height of
-        the covered step receding behind it. */}
-    <BottomSheet sheetId="details-help" label="About these details" height="capped">
+    {/* Help content sized to roughly match Details, so the covered step's
+        recede reads clearly behind the stacked sheet. */}
+    <BottomSheet sheetId="details-help" label="About these details" height="hug">
       <DetailsHelp />
       <Button
         label="Back"

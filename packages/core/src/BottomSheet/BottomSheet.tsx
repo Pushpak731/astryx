@@ -70,8 +70,8 @@ const STACK_VISUAL_DEPTH_LIMIT = 2;
 const STACK_SCALE_STEP = 0.04;
 // PROTOTYPE (spec:AST-044 OQ5): covered sheets also blur and dim with depth.
 // Pending design review; not accepted recede geometry.
-const STACK_BLUR_STEP_PX = 2;
-const STACK_BRIGHTNESS_STEP = 0.08;
+const STACK_BLUR_STEP_PX = 1;
+const STACK_BRIGHTNESS_STEP = 0.04;
 
 function transformForStackDepth(depth: number): string {
   const visualDepth = Math.min(STACK_VISUAL_DEPTH_LIMIT, Math.max(0, depth));
@@ -83,7 +83,7 @@ function transformForStackDepth(depth: number): string {
 }
 
 // PROTOTYPE (spec:AST-044 OQ5): depth-scaled filter for covered levels —
-// d1: blur(2px) brightness(0.92), d2: blur(4px) brightness(0.84). Applied
+// d1: blur(1px) brightness(0.96), d2: blur(2px) brightness(0.92). Applied
 // only at depth > 0, where the positioner already carries a transform, so the
 // filter's containing-block effect on fixed descendants adds nothing new; the
 // filtered level is inert either way. Rides the same transition (and the same

@@ -1054,7 +1054,7 @@ describe('BottomSheetSwitcher ordered path', () => {
     expect(issuesLayer).toHaveAttribute('aria-hidden', 'true');
     expect(issuesLayer.getAttribute('style')).toContain('scale(0.96)');
     expect(issuesLayer.getAttribute('style')).toContain(
-      'blur(2px) brightness(0.92)',
+      'blur(1px) brightness(0.96)',
     );
     expect(detailsLayer).not.toHaveAttribute('hidden');
     expect(detailsLayer).not.toHaveAttribute('inert');

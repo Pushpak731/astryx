@@ -38,13 +38,10 @@ export default function BottomSheetSwitcherShowcase() {
       <BottomSheetSwitcher
         activeSheets={activeSheets}
         onActiveSheetsChange={setActiveSheets}>
-        {/* The first step and its stacked help sheet share height="capped"
-            so the stacked sheet presents at the same height as the covered
-            step behind it (prototype parity pending spec:AST-044 OQ5). */}
         <BottomSheet
           sheetId="overview"
           label="Set up notifications"
-          height="capped">
+          height="hug">
           <Section padding={4}>
             <VStack gap={4}>
               <VStack gap={1}>
@@ -87,22 +84,44 @@ export default function BottomSheetSwitcherShowcase() {
             </VStack>
           </Section>
         </BottomSheet>
-        <BottomSheet
-          sheetId="help"
-          label="How notifications work"
-          height="capped">
+        {/* Hug-height help content sized to closely match the first step's
+            natural height, so the covered step's recede reads clearly behind
+            it (prototype parity pending spec:AST-044 OQ5). */}
+        <BottomSheet sheetId="help" label="How notifications work" height="hug">
           <Section padding={4}>
             <VStack gap={4}>
-              <Heading level={3}>How notifications work</Heading>
-              <Text type="body">
-                This sheet is stacked on the ordered path: the first step stays
-                mounted and recedes behind it, keeping your place. Back pops one
-                level and returns focus to the step below.
-              </Text>
+              <VStack gap={1}>
+                <Heading level={3}>How notifications work</Heading>
+                <Text type="supporting" color="secondary">
+                  Stacked above step 1
+                </Text>
+              </VStack>
+              <Divider />
               <Text type="supporting" color="secondary">
-                Notifications never share your activity with other people, and
-                every channel can be turned off later in settings.
+                This sheet is stacked on the ordered path: the first step stays
+                mounted and recedes behind it, keeping your place.
               </Text>
+              <VStack gap={3}>
+                <VStack gap={1}>
+                  <Text type="label">Back returns one level</Text>
+                  <Text type="supporting" color="secondary">
+                    Popping the path reveals the step below with its state and
+                    focus intact.
+                  </Text>
+                </VStack>
+                <VStack gap={1}>
+                  <Text type="label">Private by default</Text>
+                  <Text type="supporting" color="secondary">
+                    Notifications never share your activity with other people.
+                  </Text>
+                </VStack>
+                <VStack gap={1}>
+                  <Text type="label">Easy to change later</Text>
+                  <Text type="supporting" color="secondary">
+                    Every channel can be turned off any time in settings.
+                  </Text>
+                </VStack>
+              </VStack>
               <HStack gap={2} hAlign="end">
                 <Button label="Back" onClick={popSheet} />
               </HStack>
