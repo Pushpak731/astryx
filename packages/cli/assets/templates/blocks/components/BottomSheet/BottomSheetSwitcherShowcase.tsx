@@ -115,12 +115,6 @@ export default function BottomSheetSwitcherShowcase() {
                     Notifications never share your activity with other people.
                   </Text>
                 </VStack>
-                <VStack gap={1}>
-                  <Text type="label">Easy to change later</Text>
-                  <Text type="supporting" color="secondary">
-                    Every channel can be turned off any time in settings.
-                  </Text>
-                </VStack>
               </VStack>
               <HStack gap={2} hAlign="end">
                 <Button label="Back" onClick={popSheet} />
