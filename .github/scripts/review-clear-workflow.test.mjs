@@ -394,19 +394,19 @@ describe('review-clear exact-head workflow', () => {
 
       expect(mutations(h.calls)).toEqual([
         {
-          type: 'remove-label',
-          input: expect.objectContaining({
-            issue_number: 6744,
-            name: 'needs:code-review',
-          }),
-        },
-        {
           type: 'status',
           input: expect.objectContaining({
             sha: FORK_SHA,
             context: 'review-required',
             state: 'success',
             description: 'Cleared by code-owner approval.',
+          }),
+        },
+        {
+          type: 'remove-label',
+          input: expect.objectContaining({
+            issue_number: 6744,
+            name: 'needs:code-review',
           }),
         },
       ]);
@@ -643,15 +643,15 @@ describe('review-clear exact-head workflow', () => {
 
       expect(mutations(h.calls)).toEqual([
         {
-          type: 'remove-label',
-          input: expect.objectContaining({issue_number: 31}),
-        },
-        {
           type: 'status',
           input: expect.objectContaining({
             context: 'review-required/stacked-pr-31',
             state: 'success',
           }),
+        },
+        {
+          type: 'remove-label',
+          input: expect.objectContaining({issue_number: 31}),
         },
       ]);
       // The main PR's required context is not this run's to change.
@@ -752,7 +752,7 @@ describe('review-clear exact-head workflow', () => {
     });
   });
 
-  it('re-reads the PR before every mutation', async () => {
+  it('re-decides from the live PR before every mutation', async () => {
     const h = harness([review('APPROVED')], {
       statuses: [pendingGate],
     });
@@ -773,11 +773,11 @@ describe('review-clear exact-head workflow', () => {
     expect(order.map(call => call?.type ?? call)).toEqual([
       'read:17', // candidate
       'read:17', // reconcile
-      'read:17', // before removing the label
-      'remove-label',
-      'read:17',
+      'read:17', // re-decide before the status
       'status',
-      'read:17',
+      'read:17', // verify the status; re-decide before the label
+      'remove-label',
+      'read:17', // re-decide before the check run
       'check-update',
     ]);
     for (const call of order) {
@@ -787,5 +787,111 @@ describe('review-clear exact-head workflow', () => {
         readSinceWrite = false;
       }
     }
+  });
+
+  describe('runs that overlap or finish out of order', () => {
+    // Runs never cancel one another. Each case below lands another run's
+    // review or flag between this run's decision and its writes.
+    const changesRequested = review('CHANGES_REQUESTED');
+
+    it('restores instead of clearing when a changes-requested lands before the write', async () => {
+      const h = harness([review('APPROVED')], {
+        // Read 3 is the re-decision immediately before the status write.
+        onPullGet: (_number, count, current) => {
+          if (count === 3) current.reviews.push(changesRequested);
+        },
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([
+        {
+          type: 'status',
+          input: expect.objectContaining({
+            state: 'pending',
+            description: 'Waiting on code review after approval withdrawal.',
+          }),
+        },
+      ]);
+      expect(h.calls).toContain(
+        'info:PR #17: the gate decision changed from clear to restore while reconciling; reconciling again.',
+      );
+    });
+
+    it('corrects its own success when a changes-requested lands right after it', async () => {
+      const h = harness([review('APPROVED')], {
+        // Read 4 verifies the success write.
+        onPullGet: (_number, count, current) => {
+          if (count === 4) current.reviews.push(changesRequested);
+        },
+      });
+
+      await run(h);
+
+      const statuses = mutations(h.calls).filter(
+        call => call.type === 'status',
+      );
+      expect(statuses.map(call => call.input.state)).toEqual([
+        'success',
+        'pending',
+      ]);
+      // The label was never removed, so the restore leaves it in place.
+      expect(
+        mutations(h.calls).some(call => call.type === 'remove-label'),
+      ).toBe(false);
+    });
+
+    it('restores when an older approval run starts after a later changes-requested', async () => {
+      const h = harness([review('APPROVED'), changesRequested], {
+        labels: [],
+        statuses: [clearedGate],
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([
+        {type: 'status', input: expect.objectContaining({state: 'pending'})},
+        {type: 'add-label', input: expect.objectContaining({issue_number: 17})},
+      ]);
+    });
+
+    it('does nothing when review-signal marks the head ungated before the write', async () => {
+      const h = harness([review('APPROVED')], {
+        onPullGet: (_number, count, current) => {
+          if (count === 3) current.labels = [];
+        },
+      });
+      h.github.rest.repos.listCommitStatusesForRef = async () => ({
+        data:
+          h.calls.filter(call => call === 'read:17').length >= 3
+            ? [ungatedSuccess]
+            : [pendingGate],
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([]);
+    });
+
+    it('clears a gate owned only by its label without dropping the label first', async () => {
+      // Writing the status first keeps the gate owned while the label goes.
+      const h = harness([review('APPROVED')], {statuses: []});
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([
+        {
+          type: 'status',
+          input: expect.objectContaining({
+            state: 'success',
+            description: 'Cleared by code-owner approval.',
+          }),
+        },
+        {
+          type: 'remove-label',
+          input: expect.objectContaining({issue_number: 17}),
+        },
+      ]);
+    });
   });
 });

@@ -98,6 +98,7 @@ async function runSignal({
   diff,
   secondFiles,
   statuses = [],
+  onReviewsRead,
 } = {}) {
   delete globalThis.__untrustedClassifierRan;
   const state = {
@@ -106,6 +107,8 @@ async function runSignal({
     pullGets: 0,
     fileReads: 0,
     diffReads: 0,
+    reviewReads: 0,
+    reviews: structuredClone(reviews),
     // Ordered reads of this PR and mutations, to check every mutation re-reads.
     log: [],
   };
@@ -182,7 +185,11 @@ async function runSignal({
                 : filesNow(),
           };
         }),
-        listReviews: async () => ({data: reviews}),
+        listReviews: async () => {
+          state.reviewReads += 1;
+          onReviewsRead?.(state.reviewReads, state);
+          return {data: structuredClone(state.reviews)};
+        },
         requestReviewers: mutations.requestReviewers,
       },
       repos: {
@@ -996,5 +1003,70 @@ describe('review-signal re-reads the PR before every mutation', () => {
           'Head is shared with open PR #6744; each needs its own head.',
       }),
     ]);
+  });
+});
+
+describe('review-signal and a review that lands while it classifies', () => {
+  const approved = {
+    user: {login: 'engineer'},
+    state: 'APPROVED',
+    commit_id: HEAD,
+  };
+  const changesRequested = {...approved, state: 'CHANGES_REQUESTED'};
+
+  it('reclassifies instead of clearing when a changes-requested lands before the write', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      reviews: [approved],
+      // Read 2 re-checks the approval immediately before the status write.
+      onReviewsRead: (count, state) => {
+        if (count === 2) state.reviews.push(changesRequested);
+      },
+    });
+
+    expect(h.core.setFailed).not.toHaveBeenCalled();
+    expect(statusWrites(h)).toEqual([
+      expect.objectContaining({
+        state: 'pending',
+        description: 'Waiting on code review: community contribution',
+      }),
+    ]);
+    expect(h.core.info).toHaveBeenCalledWith(
+      'PR #42 changed its review state while it was classified (attempt 1 of 3); reading it again.',
+    );
+  });
+
+  it('corrects its own success when a changes-requested lands right after it', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      reviews: [approved],
+      // Read 3 verifies the approval after the status write.
+      onReviewsRead: (count, state) => {
+        if (count === 3) state.reviews.push(changesRequested);
+      },
+    });
+
+    expect(h.core.setFailed).not.toHaveBeenCalled();
+    expect(
+      statusWrites(h).map(write => [write.state, write.description]),
+    ).toEqual([
+      ['success', 'Cleared by code-owner approval.'],
+      ['pending', 'Waiting on code review: community contribution'],
+    ]);
+  });
+
+  it('does not re-check approvals for a decision that does not rest on them', async () => {
+    const h = await runSignal({
+      eventName: 'pull_request_target',
+      live: pull({author: 'engineer'}),
+    });
+
+    expect(statusWrites(h)).toEqual([
+      expect.objectContaining({
+        state: 'success',
+        description: 'No code review required.',
+      }),
+    ]);
+    expect(h.state.reviewReads).toBe(1);
   });
 });

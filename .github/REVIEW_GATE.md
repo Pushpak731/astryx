@@ -206,10 +206,20 @@ Candidates come from the run's own list, GitHub's commit association, and every
 open pull request whose head is that exact commit (the only source that finds a
 fork pull request); each is re-read and must match the commit and branch. When
 more than one open pull request matches, review-clear restores withdrawn gates
-but never clears one. Review-clear runs share a cancellation group only when
-they name the same head commit and branch, so a newer run replaces an older one
-only when it reconciles the same pull requests. Same-head checks in all three workflows scan the open pull
-requests for the same reason.
+but never clears one. Same-head checks in all three workflows scan the open
+pull requests for the same reason.
+
+Review-clear runs never cancel one another: each run is its own concurrency
+group, because GitHub compares group names case-insensitively while branch
+names are case-sensitive, so no branch-derived key is exact. Runs can therefore
+overlap or finish out of order. Before every mutation, and again after its
+status write, a run re-reads the pull request and recomputes its decision from
+the live exact-head reviews, gate status, and labels; if the decision changed,
+it reconciles again. It writes the status before changing the label in both
+directions, so a gate stays owned while it is cleared or restored. Every review
+change starts its own run after the change, so the last run to write also
+verifies last. Review-signal likewise re-reads the exact-head approval before
+and after a status write that depends on it, and starts over if it changed.
 
 The spec gate enables auto-merge only for a pull request that targets the
 default branch directly and is not part of a stack. It withdraws auto-merge it

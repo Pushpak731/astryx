@@ -257,11 +257,27 @@ jobs:
             async function ensureUnmoved() {
               if (await moved()) throw new Retry('moved while it was classified');
             }
+            // The effective exact-head ENGOWNER approval, read live.
+            async function readCodeApproval(engOwners) {
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner, repo, pull_number: pr.number, per_page: 100,
+              });
+              return reviewDecision.resolveReviewApprovals({
+                reviews,
+                headSha: pr.head.sha,
+                engOwners,
+                designOwners: [],
+              }).codeApproved;
+            }
             // The one path that writes the gate status. A required context is
             // shared by every PR with this head, so when another open PR that
             // also reads it shares the head, no single decision can be right
-            // for both: publish pending until the heads differ.
-            async function publishGate(state, description) {
+            // for both: publish pending until the heads differ. When the
+            // decision rests on the approval state, that state is re-read
+            // before the write and verified after it, because review-clear
+            // can act on a review that lands in between; a change starts the
+            // classification over.
+            async function publishGate(state, description, approval = null) {
               let finalState = state;
               let finalDescription = description;
               if (scope.governed) {
@@ -292,12 +308,22 @@ jobs:
                   finalDescription = `Head is shared with open PR ${siblings.map((n) => `#${n}`).join(', ')}; each needs its own head.`.slice(0, 140);
                 }
               }
+              async function ensureApprovalUnchanged() {
+                if (
+                  approval &&
+                  (await readCodeApproval(approval.engOwners)) !== approval.codeApproved
+                ) {
+                  throw new Retry('changed its review state while it was classified');
+                }
+              }
+              await ensureApprovalUnchanged();
               await ensureUnmoved();
               await github.rest.repos.createCommitStatus({
                 owner, repo, sha: pr.head.sha,
                 context: GATE, state: finalState, description: finalDescription,
               });
               core.info(`${GATE} status: ${finalState}`);
+              await ensureApprovalUnchanged();
             }
             const author = pr.user.login.toLowerCase();
             // Bots (Dependabot, github-actions, etc.) are our own automation,
@@ -750,7 +776,12 @@ jobs:
               : codeHighRisk && codeApproved
                 ? 'Cleared by code-owner approval.'
                 : 'No code review required.';
-            await publishGate(codeGated ? 'pending' : 'success', gateDescription);
+            // Only a code-gated decision rests on the approval state.
+            await publishGate(
+              codeGated ? 'pending' : 'success',
+              gateDescription,
+              codeHighRisk ? { codeApproved, engOwners } : null,
+            );
             // Neutralize any stale "review-required" CHECK RUN left over from the
             // pre-status gate. Such a leftover (conclusion action_required) drags
             // the status rollup to FAILURE even though we now gate via a commit
