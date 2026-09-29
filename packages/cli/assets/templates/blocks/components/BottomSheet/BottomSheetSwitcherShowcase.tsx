@@ -5,217 +5,154 @@
 import {useState} from 'react';
 import {BottomSheet, BottomSheetSwitcher} from '@astryxdesign/core/BottomSheet';
 import {Button} from '@astryxdesign/core/Button';
-import {CheckboxInput} from '@astryxdesign/core/CheckboxInput';
-import {Divider} from '@astryxdesign/core/Divider';
 import {Heading} from '@astryxdesign/core/Heading';
+import {List, ListItem} from '@astryxdesign/core/List';
 import {Section} from '@astryxdesign/core/Section';
 import {HStack, VStack} from '@astryxdesign/core/Stack';
 import {Text} from '@astryxdesign/core/Text';
-import {RadioList, RadioListItem} from '@astryxdesign/core/RadioList';
 
-type NotificationSheetHeight = 'hug' | 'capped';
-
-interface NotificationOverviewSheetProps {
-  height: NotificationSheetHeight;
-  onCancel: () => void;
-  onContinue: () => void;
+interface Issue {
+  id: string;
+  title: string;
+  summary: string;
+  status: string;
+  detail: string;
+  activity: ReadonlyArray<string>;
 }
 
-function NotificationOverviewSheet({
-  height,
-  onCancel,
-  onContinue,
-}: NotificationOverviewSheetProps) {
-  return (
-    <BottomSheet
-      sheetId="overview"
-      label="Set up notifications"
-      height={height}>
-      <Section padding={4}>
-        <VStack gap={4}>
-          <VStack gap={1}>
-            <Heading level={3}>Set up notifications</Heading>
-            <Text type="supporting" color="secondary">
-              Step 1 of 3
-            </Text>
-          </VStack>
-          <Divider />
-          <Text type="supporting" color="secondary">
-            Stay informed about activity that matters without checking back
-            throughout the day.
-          </Text>
-          <VStack gap={3}>
-            <VStack gap={1}>
-              <Text type="label">Important activity</Text>
-              <Text type="supporting" color="secondary">
-                Know when someone mentions you or needs your attention.
-              </Text>
-            </VStack>
-            <VStack gap={1}>
-              <Text type="label">Timely reminders</Text>
-              <Text type="supporting" color="secondary">
-                Get a reminder before work reaches its due date.
-              </Text>
-            </VStack>
-            <VStack gap={1}>
-              <Text type="label">Useful summaries</Text>
-              <Text type="supporting" color="secondary">
-                Catch up on anything you may have missed.
-              </Text>
-            </VStack>
-          </VStack>
-          <HStack gap={2} hAlign="end">
-            <Button label="Cancel" variant="secondary" onClick={onCancel} />
-            <Button label="Continue" onClick={onContinue} />
-          </HStack>
-        </VStack>
-      </Section>
-    </BottomSheet>
-  );
-}
+const ISSUES: ReadonlyArray<Issue> = [
+  {
+    id: 'login-timeout',
+    title: 'Sign-in times out on slow networks',
+    summary: 'Reported 2 hours ago · 14 people affected',
+    status: 'Investigating',
+    detail:
+      'Sign-in requests over slow connections exceed the gateway timeout ' +
+      'before the second factor completes, so people land back on the ' +
+      'sign-in form without an error message.',
+    activity: [
+      'Gateway timeout raised to 30 seconds on the canary tier.',
+      'Retry telemetry added to the sign-in form.',
+      'Issue opened from support escalation.',
+    ],
+  },
+  {
+    id: 'sync-conflict',
+    title: 'Offline edits overwrite newer changes',
+    summary: 'Reported yesterday · 6 people affected',
+    status: 'Fix in review',
+    detail:
+      'Edits made offline replace newer server versions instead of merging ' +
+      'when the device reconnects, dropping the changes made elsewhere in ' +
+      'the meantime.',
+    activity: [
+      'Merge-on-reconnect fix opened for review.',
+      'Conflict reproduction recorded on two devices.',
+      'Issue opened from a customer report.',
+    ],
+  },
+  {
+    id: 'export-encoding',
+    title: 'CSV export garbles accented names',
+    summary: 'Reported 3 days ago · 2 people affected',
+    status: 'Scheduled',
+    detail:
+      'Exports omit the byte-order mark, so spreadsheets opened with a ' +
+      'legacy default encoding show accented characters as mojibake.',
+    activity: [
+      'Fix scheduled for the next maintenance release.',
+      'Issue confirmed against three spreadsheet apps.',
+    ],
+  },
+];
 
-interface NotificationFrequencySheetProps {
-  height: NotificationSheetHeight;
-  onBack: () => void;
-  onContinue: () => void;
-}
-
-function NotificationFrequencySheet({
-  height,
-  onBack,
-  onContinue,
-}: NotificationFrequencySheetProps) {
-  const [frequency, setFrequency] = useState('daily');
-
-  return (
-    <BottomSheet
-      sheetId="frequency"
-      label="Notification frequency"
-      height={height}>
-      <Section padding={4}>
-        <VStack gap={4}>
-          <VStack gap={1}>
-            <Heading level={3}>How often?</Heading>
-            <Text type="supporting" color="secondary">
-              Step 2 of 3
-            </Text>
-          </VStack>
-          <Divider />
-          <RadioList
-            label="Notification frequency"
-            isLabelHidden
-            value={frequency}
-            onChange={setFrequency}>
-            <RadioListItem label="Immediately" value="immediately" />
-            <RadioListItem label="Daily" value="daily" />
-            <RadioListItem label="Weekly" value="weekly" />
-          </RadioList>
-          <HStack gap={2} hAlign="end">
-            <Button label="Back" variant="secondary" onClick={onBack} />
-            <Button label="Continue" onClick={onContinue} />
-          </HStack>
-        </VStack>
-      </Section>
-    </BottomSheet>
-  );
-}
-
-interface NotificationChannelsSheetProps {
-  height: NotificationSheetHeight;
-  onBack: () => void;
-  onFinish: () => void;
-}
-
-function NotificationChannelsSheet({
-  height,
-  onBack,
-  onFinish,
-}: NotificationChannelsSheetProps) {
-  const [email, setEmail] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [textMessages, setTextMessages] = useState(false);
-
-  return (
-    <BottomSheet
-      sheetId="channels"
-      label="Notification channels"
-      height={height}>
-      <Section padding={4}>
-        <VStack gap={4}>
-          <VStack gap={1}>
-            <Heading level={3}>Where should we notify you?</Heading>
-            <Text type="supporting" color="secondary">
-              Step 3 of 3
-            </Text>
-          </VStack>
-          <Divider />
-          <Text type="supporting" color="secondary">
-            Choose any combination. You can change these preferences later.
-          </Text>
-          <VStack gap={2}>
-            <CheckboxInput label="Email" value={email} onChange={setEmail} />
-            <CheckboxInput
-              label="Push notifications"
-              value={pushNotifications}
-              onChange={setPushNotifications}
-            />
-            <CheckboxInput
-              label="Text messages"
-              value={textMessages}
-              onChange={setTextMessages}
-            />
-          </VStack>
-          <HStack gap={2} hAlign="end">
-            <Button label="Back" variant="secondary" onClick={onBack} />
-            <Button label="Finish" onClick={onFinish} />
-          </HStack>
-        </VStack>
-      </Section>
-    </BottomSheet>
-  );
-}
-
-interface MultiStepSwitcherExampleProps {
-  height: NotificationSheetHeight;
-  hasScrim?: boolean;
-}
-
-function MultiStepSwitcherExample({
-  height,
-  hasScrim = true,
-}: MultiStepSwitcherExampleProps) {
-  const [activeSheet, setActiveSheet] = useState<string | null>(null);
+/**
+ * Drill-in flow on the ordered `activeSheets` path: selecting an issue pushes
+ * its details above the list, and details push a further activity level. The
+ * covered sheets stay visible and receded behind the top sheet; Back pops one
+ * level and Close all clears the path.
+ */
+export default function BottomSheetSwitcherShowcase() {
+  const [activeSheets, setActiveSheets] = useState<ReadonlyArray<string>>([]);
+  const [selectedIssueId, setSelectedIssueId] = useState(ISSUES[0].id);
+  const issue =
+    ISSUES.find(candidate => candidate.id === selectedIssueId) ?? ISSUES[0];
+  const popSheet = () => setActiveSheets(current => current.slice(0, -1));
+  const closeAll = () => setActiveSheets([]);
 
   return (
     <>
       <Button
-        label="Set up notifications"
-        onClick={() => setActiveSheet('overview')}
+        label="Browse open issues"
+        onClick={() => setActiveSheets(['issues'])}
       />
       <BottomSheetSwitcher
-        activeSheet={activeSheet}
-        onActiveSheetChange={setActiveSheet}
-        hasScrim={hasScrim}>
-        <NotificationOverviewSheet
-          height={height}
-          onCancel={() => setActiveSheet(null)}
-          onContinue={() => setActiveSheet('frequency')}
-        />
-        <NotificationFrequencySheet
-          height={height}
-          onBack={() => setActiveSheet('overview')}
-          onContinue={() => setActiveSheet('channels')}
-        />
-        <NotificationChannelsSheet
-          height={height}
-          onBack={() => setActiveSheet('frequency')}
-          onFinish={() => setActiveSheet(null)}
-        />
+        activeSheets={activeSheets}
+        onActiveSheetsChange={setActiveSheets}>
+        <BottomSheet sheetId="issues" label="Open issues" height="hug">
+          <Section padding={4}>
+            <VStack gap={3}>
+              <Heading level={3}>Open issues</Heading>
+              <List hasDividers>
+                {ISSUES.map(candidate => (
+                  <ListItem
+                    key={candidate.id}
+                    label={candidate.title}
+                    description={candidate.summary}
+                    onClick={() => {
+                      setSelectedIssueId(candidate.id);
+                      setActiveSheets(['issues', 'issue-details']);
+                    }}
+                  />
+                ))}
+              </List>
+            </VStack>
+          </Section>
+        </BottomSheet>
+        <BottomSheet sheetId="issue-details" label="Issue details" height="hug">
+          <Section padding={4}>
+            <VStack gap={4}>
+              <VStack gap={1}>
+                <Heading level={3}>{issue.title}</Heading>
+                <Text type="supporting" color="secondary">
+                  {issue.status} · {issue.summary}
+                </Text>
+              </VStack>
+              <Text type="body">{issue.detail}</Text>
+              <HStack gap={2} hAlign="end">
+                <Button label="Back" variant="secondary" onClick={popSheet} />
+                <Button
+                  label="View activity"
+                  onClick={() =>
+                    setActiveSheets(['issues', 'issue-details', 'activity'])
+                  }
+                />
+              </HStack>
+            </VStack>
+          </Section>
+        </BottomSheet>
+        <BottomSheet sheetId="activity" label="Recent activity" height="hug">
+          <Section padding={4}>
+            <VStack gap={4}>
+              <VStack gap={1}>
+                <Heading level={3}>Recent activity</Heading>
+                <Text type="supporting" color="secondary">
+                  {issue.title}
+                </Text>
+              </VStack>
+              <List hasDividers>
+                {issue.activity.map(entry => (
+                  <ListItem key={entry} label={entry} />
+                ))}
+              </List>
+              <HStack gap={2} hAlign="end">
+                <Button label="Back" variant="secondary" onClick={popSheet} />
+                <Button label="Close all" onClick={closeAll} />
+              </HStack>
+            </VStack>
+          </Section>
+        </BottomSheet>
       </BottomSheetSwitcher>
     </>
   );
-}
-
-export default function BottomSheetSwitcherShowcase() {
-  return <MultiStepSwitcherExample height="hug" />;
 }

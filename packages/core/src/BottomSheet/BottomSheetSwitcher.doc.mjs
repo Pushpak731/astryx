@@ -28,15 +28,23 @@ export const docs = {
   displayName: 'Bottom Sheet Switcher',
   group: 'BottomSheet',
   category: 'Overlay',
-  keywords: ['bottom sheet', 'switcher', 'multi-step', 'flow', 'wizard'],
+  keywords: [
+    'bottom sheet',
+    'switcher',
+    'multi-step',
+    'flow',
+    'wizard',
+    'stack',
+    'drill-in',
+  ],
   playground: {
     overlay: true,
     overlayControl: {
-      stateProp: 'activeSheet',
-      openValue: 'details',
+      stateProp: 'activeSheets',
+      openValue: ['details', 'preferences'],
     },
     defaults: {
-      activeSheet: null,
+      activeSheets: [],
       children: [
         {
           __element: 'BottomSheet',
@@ -163,9 +171,9 @@ export const docs = {
     },
     {
       name: 'onActiveSheetsChange',
-      type: "(nextIds: ReadonlyArray<string>, details: {reason: 'escape' | 'scrim' | 'swipe', dismissedSheetId: string}) => void",
+      type: "(activeSheets: ReadonlyArray<string>, details: {reason: 'escape' | 'scrim' | 'swipe', dismissedSheetId: string}) => void",
       description:
-        "Called when the top sheet requests an implicit dismissal permitted by its purpose: Escape or platform close ('escape'), a visible modal-scrim click ('scrim'), or a completed swipe ('swipe'). One dismissal removes one visible level, so nextIds is the presented path without its final id. Close-all stays an explicit caller update to [].",
+        "Called when the top sheet requests an implicit dismissal permitted by its purpose: Escape or platform close ('escape'), a visible modal-scrim click ('scrim'), or a completed swipe ('swipe'). One dismissal removes one visible level, so the next path is the presented path without its final id. Close-all stays an explicit caller update to [].",
     },
     {
       name: 'activeSheet',
@@ -177,7 +185,7 @@ export const docs = {
       name: 'onActiveSheetChange',
       type: '(activeSheet: string | null) => void',
       description:
-        "The singular counterpart of onActiveSheetsChange: called with nextIds.at(-1) ?? null (and no details) when the active sheet dismisses according to its purpose. Child BottomSheets may use purpose='form' or purpose='required' to limit implicit dismissal while flow controls can still use the same state setter to switch sheets or close the flow.",
+        "The singular counterpart of onActiveSheetsChange: called with the next path's last id (or null) and no details when the active sheet dismisses according to its purpose. Child BottomSheets may use purpose='form' or purpose='required' to limit implicit dismissal while flow controls can still use the same state setter to switch sheets or close the flow.",
     },
     {
       name: 'hasScrim',
@@ -228,32 +236,6 @@ export const docs = {
   },
   examples: [
     {
-      label: 'Three-step flow',
-      code: `const [activeSheet, setActiveSheet] = useState(null);
-
-<>
-  <Button label="Start" onClick={() => setActiveSheet('details')} />
-  <BottomSheetSwitcher
-    activeSheet={activeSheet}
-    onActiveSheetChange={setActiveSheet}>
-    <BottomSheet sheetId="details" label="Details" height="hug">
-      <SetupDetails />
-      <Button label="Continue" onClick={() => setActiveSheet('preferences')} />
-    </BottomSheet>
-    <BottomSheet sheetId="preferences" label="Preferences" height="hug">
-      <Preferences />
-      <Button label="Back" onClick={() => setActiveSheet('details')} />
-      <Button label="Continue" onClick={() => setActiveSheet('confirm')} />
-    </BottomSheet>
-    <BottomSheet sheetId="confirm" label="Confirm" height="hug">
-      <Confirmation />
-      <Button label="Back" onClick={() => setActiveSheet('preferences')} />
-      <Button label="Done" onClick={() => setActiveSheet(null)} />
-    </BottomSheet>
-  </BottomSheetSwitcher>
-</>`,
-    },
-    {
       label: 'Drill-in stack with the ordered path',
       code: `const [activeSheets, setActiveSheets] = useState([]);
 
@@ -276,6 +258,32 @@ export const docs = {
         onClick={() => setActiveSheets(current => current.slice(0, -1))}
       />
       <Button label="Close all" onClick={() => setActiveSheets([])} />
+    </BottomSheet>
+  </BottomSheetSwitcher>
+</>`,
+    },
+    {
+      label: 'Three-step flow (singular form)',
+      code: `const [activeSheet, setActiveSheet] = useState(null);
+
+<>
+  <Button label="Start" onClick={() => setActiveSheet('details')} />
+  <BottomSheetSwitcher
+    activeSheet={activeSheet}
+    onActiveSheetChange={setActiveSheet}>
+    <BottomSheet sheetId="details" label="Details" height="hug">
+      <SetupDetails />
+      <Button label="Continue" onClick={() => setActiveSheet('preferences')} />
+    </BottomSheet>
+    <BottomSheet sheetId="preferences" label="Preferences" height="hug">
+      <Preferences />
+      <Button label="Back" onClick={() => setActiveSheet('details')} />
+      <Button label="Continue" onClick={() => setActiveSheet('confirm')} />
+    </BottomSheet>
+    <BottomSheet sheetId="confirm" label="Confirm" height="hug">
+      <Confirmation />
+      <Button label="Back" onClick={() => setActiveSheet('preferences')} />
+      <Button label="Done" onClick={() => setActiveSheet(null)} />
     </BottomSheet>
   </BottomSheetSwitcher>
 </>`,
