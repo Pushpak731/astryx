@@ -37,10 +37,12 @@ permissions: {}
 concurrency:
   # Every Review signal run completes into this workflow, but only review runs
   # reconcile. Everything else is run-scoped so its skipped job cannot cancel a
-  # reconciliation in progress. Review runs for one head commit reconcile the
-  # same candidates, so a newer one may replace an older one; the head
+  # reconciliation in progress. A review run reconciles the open PRs whose head
+  # is its exact commit on its branch, so the group is that commit and branch:
+  # a newer run replaces an older one only when it reconciles the same PRs,
+  # and PRs on other branches sharing the commit are never cancelled. The head
   # repository is not used because a fork's run reports this repository.
-  group: review-clear-${{ github.event.workflow_run.event == 'pull_request_review' && format('sha-{0}', github.event.workflow_run.head_sha) || format('run-{0}', github.run_id) }}
+  group: review-clear-${{ github.event.workflow_run.event == 'pull_request_review' && format('sha-{0}-{1}', github.event.workflow_run.head_sha, github.event.workflow_run.head_branch) || format('run-{0}', github.run_id) }}
   cancel-in-progress: true
 
 jobs:

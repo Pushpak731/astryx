@@ -278,7 +278,10 @@ function dispatchEvent({pr = '42', ref = 'refs/heads/main'} = {}) {
   };
 }
 
-function workflowRunEvent(triggeringEvent) {
+function workflowRunEvent(
+  triggeringEvent,
+  {branch = 'feature/upper', sha = 'c'.repeat(40), runId = RUN_ID} = {},
+) {
   return {
     event: {name: 'workflow_run', action: 'completed'},
     context: {
@@ -290,13 +293,13 @@ function workflowRunEvent(triggeringEvent) {
             event: triggeringEvent,
             // A fork PR's review run names this repository here.
             head_repository: {full_name: REPOSITORY},
-            head_branch: 'feature/upper',
-            head_sha: 'c'.repeat(40),
+            head_branch: branch,
+            head_sha: sha,
           },
         },
         ref: 'refs/heads/main',
         repository: REPOSITORY,
-        run_id: RUN_ID,
+        run_id: runId,
       },
     },
   };
@@ -450,13 +453,56 @@ describe('stacked pull request gate triggers', () => {
     expect(runningJobs(specOwnerGate, fromDefault)).toEqual(['reconcile']);
   });
 
+  it('never lets a review on another branch cancel a reconciliation for the same commit', () => {
+    // A main PR on branch-a and a manually stacked PR on branch-b share one
+    // commit. Each review run reconciles only its own branch's PRs, so an
+    // approval on the stacked PR must not cancel a restore on the main PR.
+    const shared = 'd'.repeat(40);
+    const mainRestore = workflowRunEvent('pull_request_review', {
+      branch: 'branch-a',
+      sha: shared,
+      runId: '1001',
+    });
+    const stackedApproval = workflowRunEvent('pull_request_review', {
+      branch: 'branch-b',
+      sha: shared,
+      runId: '1002',
+    });
+    expect(runningJobs(reviewClear, mainRestore)).toEqual(['clear']);
+    expect(runningJobs(reviewClear, stackedApproval)).toEqual(['clear']);
+    expect(concurrencyGroup(reviewClear, mainRestore)).not.toBe(
+      concurrencyGroup(reviewClear, stackedApproval),
+    );
+
+    // Two reviews on one branch and commit reconcile the same PRs, so the
+    // newer run may still replace the older one.
+    const laterOnBranchA = workflowRunEvent('pull_request_review', {
+      branch: 'branch-a',
+      sha: shared,
+      runId: '1003',
+    });
+    expect(concurrencyGroup(reviewClear, laterOnBranchA)).toBe(
+      concurrencyGroup(reviewClear, mainRestore),
+    );
+
+    // A new push is a new commit and a new group.
+    const afterPush = workflowRunEvent('pull_request_review', {
+      branch: 'branch-a',
+      sha: 'e'.repeat(40),
+      runId: '1004',
+    });
+    expect(concurrencyGroup(reviewClear, afterPush)).not.toBe(
+      concurrencyGroup(reviewClear, mainRestore),
+    );
+  });
+
   it('keeps skipped review-clear runs from cancelling a reconciliation', () => {
     const afterReview = workflowRunEvent('pull_request_review');
     expect(runningJobs(reviewClear, afterReview)).toEqual(['clear']);
-    // Keyed by the reviewed commit, never by head_repository, which names
-    // this repository even for a fork PR's review.
+    // Keyed by the reviewed commit and branch, never by head_repository,
+    // which names this repository even for a fork PR's review.
     expect(concurrencyGroup(reviewClear, afterReview)).toBe(
-      `review-clear-sha-${'c'.repeat(40)}`,
+      `review-clear-sha-${'c'.repeat(40)}-feature/upper`,
     );
 
     for (const triggeringEvent of [

@@ -206,7 +206,9 @@ Candidates come from the run's own list, GitHub's commit association, and every
 open pull request whose head is that exact commit (the only source that finds a
 fork pull request); each is re-read and must match the commit and branch. When
 more than one open pull request matches, review-clear restores withdrawn gates
-but never clears one. Same-head checks in all three workflows scan the open pull
+but never clears one. Review-clear runs share a cancellation group only when
+they name the same head commit and branch, so a newer run replaces an older one
+only when it reconciles the same pull requests. Same-head checks in all three workflows scan the open pull
 requests for the same reason.
 
 The spec gate enables auto-merge only for a pull request that targets the

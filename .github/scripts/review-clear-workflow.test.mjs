@@ -565,6 +565,106 @@ describe('review-clear exact-head workflow', () => {
     });
   });
 
+  describe('two PRs on different branches sharing a commit', () => {
+    // branch-a targets main; branch-b is stacked manually on another branch.
+    const pulls = ({
+      mainReviews,
+      stackedReviews,
+      mainLabels,
+      stackedLabels,
+    }) => [
+      pull({
+        number: 30,
+        headRef: 'branch-a',
+        reviews: mainReviews,
+        labels: mainLabels,
+      }),
+      pull({
+        number: 31,
+        headRef: 'branch-b',
+        baseRef: 'feature/lower',
+        reviews: stackedReviews,
+        labels: stackedLabels,
+      }),
+    ];
+    const statuses = [
+      clearedGate,
+      gateStatus(
+        'pending',
+        'Waiting on code review: core change',
+        'review-required/stacked-pr-31',
+      ),
+    ];
+    const runFor = (branch, pullRequests) => ({
+      branch,
+      sha: head2,
+      pullRequests,
+    });
+
+    it('restores only the main PR for a changes-requested review on its branch', async () => {
+      const h = harness([], {
+        pulls: pulls({
+          mainReviews: [review('APPROVED'), review('CHANGES_REQUESTED')],
+          stackedReviews: [review('APPROVED')],
+          mainLabels: [],
+          stackedLabels: ['needs:code-review'],
+        }),
+        runHead: runFor('branch-a', [{number: 30}]),
+        statuses,
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([
+        {
+          type: 'status',
+          input: expect.objectContaining({
+            context: 'review-required',
+            state: 'pending',
+          }),
+        },
+        {type: 'add-label', input: expect.objectContaining({issue_number: 30})},
+      ]);
+    });
+
+    it('clears only the stacked PR scoped gate for an approval on its branch', async () => {
+      const h = harness([], {
+        pulls: pulls({
+          mainReviews: [review('APPROVED'), review('CHANGES_REQUESTED')],
+          stackedReviews: [review('APPROVED')],
+          mainLabels: [],
+          stackedLabels: ['needs:code-review'],
+        }),
+        runHead: runFor('branch-b', [{number: 31}]),
+        statuses,
+      });
+
+      await run(h);
+
+      expect(mutations(h.calls)).toEqual([
+        {
+          type: 'remove-label',
+          input: expect.objectContaining({issue_number: 31}),
+        },
+        {
+          type: 'status',
+          input: expect.objectContaining({
+            context: 'review-required/stacked-pr-31',
+            state: 'success',
+          }),
+        },
+      ]);
+      // The main PR's required context is not this run's to change.
+      expect(
+        mutations(h.calls).some(
+          call =>
+            call.input.context === 'review-required' ||
+            call.input.issue_number === 30,
+        ),
+      ).toBe(false);
+    });
+  });
+
   describe('scope of the gate a pull request owns', () => {
     it('clears only the scoped context of a manually stacked PR', async () => {
       const scoped = 'review-required/stacked-pr-17';
