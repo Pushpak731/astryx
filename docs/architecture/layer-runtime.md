@@ -148,6 +148,16 @@ the standard fallback list and their existing component-owned or intrinsic size.
 | Selector, MultiSelector, and ComplexSelector popovers        | Selector-family component | Match the trigger minimum without a candidate-relative cap; inherit Layer fallback order without a separate sizing change. Bottom-sheet presentation is separate. |
 | HoverCard, Tooltip, and keyboard hints                       | Owning surface/content    | Keep intrinsic or component-capped content on the ordinary Layer path; no candidate-relative clamp participates.                                                  |
 
+The same behavior reaches composed callers without another sizing owner:
+Table filtering, ChatEmojiPicker, and TourStep inherit Popover; MoreMenu and
+Schedule's view selector inherit DropdownMenu; Typeahead, Tokenizer, and
+PowerSearch's main result menu inherit BaseTypeahead; Pagination and
+TransferListSelector inherit their Selector-family owner. Date inputs, ordinary
+TopNav/SideNav menus, Chat trigger menus, TabMenu, and Breadcrumbs use direct
+standard popovers but do not impose a candidate-relative size cap. Custom
+anchored geometry, fixed layers, bottom sheets, and submenu-specific geometry
+remain outside this invariant.
+
 ### Current browser support behavior
 
 Native Popover API plus CSS Anchor Positioning provide the complete behavior

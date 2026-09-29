@@ -2,6 +2,7 @@
 
 import {useState} from 'react';
 import type {Meta, StoryObj} from '@storybook/react';
+import {expect, waitFor} from 'storybook/test';
 import {
   TopNav,
   TopNavHeading,
@@ -233,6 +234,59 @@ export const MegaMenu: Story = {
         />
       </div>
     );
+  },
+};
+
+export const MegaMenuPositionFallbackBeforeSizing: Story = {
+  name: 'Mega menu position fallback before sizing',
+  parameters: {layout: 'fullscreen'},
+  render: () => (
+    <div style={{minHeight: '100vh', paddingTop: 420, boxSizing: 'border-box'}}>
+      <TopNav
+        label="Fallback navigation"
+        heading={<TopNavHeading heading="Acme" />}
+        startContent={
+          <TopNavMegaMenu
+            label="Products"
+            items={
+              <>
+                {Array.from({length: 8}, (_, index) => (
+                  <TopNavMegaMenuItem
+                    key={index}
+                    title={`Product ${index + 1}`}
+                    description="A detailed product description"
+                    href="#"
+                  />
+                ))}
+              </>
+            }
+          />
+        }
+      />
+    </div>
+  ),
+  play: async ({canvasElement}) => {
+    const trigger = canvasElement.querySelector<HTMLButtonElement>('button');
+    if (trigger == null) {
+      throw new Error('TopNavMegaMenu fallback trigger did not render');
+    }
+    trigger.click();
+    const group = await waitFor(() => {
+      const found = document.querySelector<HTMLElement>(
+        '[role="group"][aria-label="Products"]',
+      );
+      expect(found).not.toBeNull();
+      return found;
+    });
+    const layer = group?.closest<HTMLElement>('[popover]');
+    if (layer == null) {
+      throw new Error('TopNavMegaMenu fallback layer did not render');
+    }
+    const triggerRect = trigger.getBoundingClientRect();
+    const layerRect = layer.getBoundingClientRect();
+    expect(layerRect.height).toBeGreaterThan(180);
+    expect(layerRect.bottom).toBeLessThanOrEqual(triggerRect.top + 1);
+    expect(layerRect.top).toBeGreaterThanOrEqual(11);
   },
 };
 
