@@ -2,6 +2,6 @@
 '@astryxdesign/core': patch
 ---
 
-[fix] Menus now try position fallbacks from any trigger location before narrowing to the safe viewport width.
+[fix] Anchored menus, popovers, search results, and mega menus now try safe position fallbacks before narrowing their preferred size.
 
 @cixzhang

@@ -3,7 +3,7 @@
 /**
  * @file TopNavMegaMenu.test.tsx
  * @input Uses vitest, @testing-library/react, TopNavMegaMenu and sub-components
- * @output Unit tests for TopNavMegaMenu slots API and mobile modes
+ * @output Tests TopNavMegaMenu slots, sizing fallback, and mobile modes
  * @position Testing; validates TopNavMegaMenu behavior
  *
  * SYNC: When TopNavMegaMenu changes, update tests to match new behavior
@@ -17,6 +17,19 @@ import userEvent from '@testing-library/user-event';
 import {TopNavMegaMenu} from './TopNavMegaMenu';
 import {TopNavMegaMenuItem} from './TopNavMegaMenuItem';
 import {TopNavRenderContext} from './TopNavRenderContext';
+import {spacingVars} from '../theme/tokens.stylex';
+
+const TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER = spacingVars['--spacing-3'];
+const TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE = `calc(100vb - max(${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER}, env(safe-area-inset-top, 0px)) - max(${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER}, env(safe-area-inset-bottom, 0px)))`;
+const TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE_FALLBACK = `calc(100vh - ${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER} - ${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER})`;
+const layerProbe = stylex.create({
+  viewportFit: {
+    maxBlockSize: stylex.firstThatWorks(
+      TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE,
+      TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE_FALLBACK,
+    ),
+  },
+});
 
 // =============================================================================
 // Popover API mock — jsdom implements no Popover API, so default-mode tests
@@ -83,6 +96,29 @@ describe('TopNavMegaMenu — default mode', () => {
       />,
     );
     expect(screen.getByRole('button', {name: 'Products'})).toBeInTheDocument();
+  });
+
+  it('preserves panel height through guttered fallbacks before viewport clamping', () => {
+    render(
+      <TopNavMegaMenu
+        label="Products"
+        items={<TopNavMegaMenuItem title="Analytics" href="/analytics" />}
+      />,
+    );
+
+    const layer = screen
+      .getByRole('group', {name: 'Products', hidden: true})
+      .closest('[popover]') as HTMLElement;
+    expect(layer).not.toBeNull();
+    expect(layer.style.positionTryFallbacks).toContain(
+      '--astryx-layer-block-end-guttered-full-axis',
+    );
+    const {className = ''} = stylex.props(layerProbe.viewportFit);
+    for (const atomicClass of className
+      .split(' ')
+      .filter(name => name !== '' && !name.includes('__'))) {
+      expect(layer).toHaveClass(atomicClass);
+    }
   });
 
   it('trigger has aria-haspopup and aria-expanded attributes', () => {

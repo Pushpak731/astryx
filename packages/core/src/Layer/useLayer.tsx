@@ -93,6 +93,42 @@ export type LayerPlacement = 'above' | 'below' | 'start' | 'end';
  */
 export type LayerAlignment = 'start' | 'center' | 'end';
 
+const LAYER_BLOCK_START_GUTTERED_FULL_AXIS_TRY =
+  '--astryx-layer-block-start-guttered-full-axis';
+const LAYER_BLOCK_END_GUTTERED_FULL_AXIS_TRY =
+  '--astryx-layer-block-end-guttered-full-axis';
+const LAYER_INLINE_START_GUTTERED_FULL_AXIS_TRY =
+  '--astryx-layer-inline-start-guttered-full-axis';
+const LAYER_INLINE_END_GUTTERED_FULL_AXIS_TRY =
+  '--astryx-layer-inline-end-guttered-full-axis';
+
+function getGutteredFullAxisFallbacks(
+  placement: LayerPlacement,
+): readonly [string, string] {
+  switch (placement) {
+    case 'above':
+      return [
+        LAYER_BLOCK_START_GUTTERED_FULL_AXIS_TRY,
+        LAYER_BLOCK_END_GUTTERED_FULL_AXIS_TRY,
+      ];
+    case 'below':
+      return [
+        LAYER_BLOCK_END_GUTTERED_FULL_AXIS_TRY,
+        LAYER_BLOCK_START_GUTTERED_FULL_AXIS_TRY,
+      ];
+    case 'start':
+      return [
+        LAYER_INLINE_START_GUTTERED_FULL_AXIS_TRY,
+        LAYER_INLINE_END_GUTTERED_FULL_AXIS_TRY,
+      ];
+    case 'end':
+      return [
+        LAYER_INLINE_END_GUTTERED_FULL_AXIS_TRY,
+        LAYER_INLINE_START_GUTTERED_FULL_AXIS_TRY,
+      ];
+  }
+}
+
 /**
  * Render props for context mode (anchor positioning)
  */
@@ -470,6 +506,22 @@ export function getPositionTryFallbacks(
     return `${flips}, ${fullAxis}`;
   }
   return `${flips}, ${same} span-self-block-start, ${same} span-self-block-end, ${opposite} span-self-block-start, ${opposite} span-self-block-end, ${fullAxis}`;
+}
+
+/**
+ * Package-internal ordered fallback list for surfaces whose own sizing policy
+ * clamps to the safe viewport. The named final tries add physical safe-area
+ * gutters without making sizing a Layer responsibility.
+ */
+export function getGutteredPositionTryFallbacks(
+  placement: LayerPlacement,
+  alignment: LayerAlignment,
+): string {
+  return getPositionTryFallbacks(
+    placement,
+    alignment,
+    getGutteredFullAxisFallbacks(placement),
+  );
 }
 
 /**

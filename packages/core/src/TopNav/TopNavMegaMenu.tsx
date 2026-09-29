@@ -4,7 +4,7 @@
 
 /**
  * @file TopNavMegaMenu.tsx
- * @input Uses React, StyleX, usePopover (Popover API + CSS anchor positioning)
+ * @input Uses React, StyleX, usePopover, and Layer guttered fallback ordering
  * @output Exports TopNavMegaMenu component and related types
  * @position Navigation item with hover-triggered full-width mega menu for TopNav
  *
@@ -50,6 +50,7 @@ import {
   borderVars,
 } from '../theme/tokens.stylex';
 import {usePopover} from '../Popover/usePopover';
+import {getGutteredPositionTryFallbacks} from '../Layer/useLayer';
 import {useMenuHover} from '../hooks/useMenuHover';
 import {Grid} from '../Grid/Grid';
 import {Icon} from '../Icon';
@@ -66,6 +67,10 @@ import {useMergedRefs} from '../hooks/useMergedRefs';
 // =============================================================================
 // Styles
 // =============================================================================
+
+const TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER = spacingVars['--spacing-3'];
+const TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE = `calc(100vb - max(${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER}, env(safe-area-inset-top, 0px)) - max(${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER}, env(safe-area-inset-bottom, 0px)))`;
+const TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE_FALLBACK = `calc(100vh - ${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER} - ${TOP_NAV_MEGA_MENU_VIEWPORT_GUTTER})`;
 
 const styles = stylex.create({
   trigger: {
@@ -137,10 +142,8 @@ const styles = stylex.create({
       transform: 'translateY(-4px)',
     },
   },
-  // Clamp the anchored layer to the space available below the nav so a tall
-  // menu never runs off the bottom of the viewport. The layer is positioned
-  // with position-area: self-block-end, so its containing block spans from
-  // the nav's block-end to the viewport edge — 100% is exactly that space.
+  // Preserve the requested block size while the panel can fit above or below
+  // the nav, then clamp to the safe viewport only when no candidate can fit.
   // The layer is a flex column so panelContainer can shrink and scroll its
   // own content, keeping the surface radius/shadow static at the edges.
   // Internal scroll is a stopgap until the mobile bottom-sheet lands.
@@ -150,7 +153,10 @@ const styles = stylex.create({
       ':popover-open': 'flex',
     },
     flexDirection: 'column',
-    maxHeight: `calc(100% - ${spacingVars['--spacing-3']})`,
+    maxBlockSize: stylex.firstThatWorks(
+      TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE,
+      TOP_NAV_MEGA_MENU_MAX_BLOCK_SIZE_FALLBACK,
+    ),
   },
   // Visual styles for the panel content container.
   panelContainer: {
@@ -528,6 +534,12 @@ function DefaultMegaMenu({
         {
           placement: 'below',
           alignment: slot,
+          style: {
+            positionTryFallbacks: getGutteredPositionTryFallbacks(
+              'below',
+              slot,
+            ),
+          },
           xstyle: [styles.panelAnimation, styles.panelViewportFit],
         },
       )}

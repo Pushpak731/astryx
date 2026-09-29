@@ -560,6 +560,9 @@ describe('DropdownMenu', () => {
     expect(popover?.getAttribute('style')).toMatch(
       /position-try-fallbacks: [^;]*--[^;]*--/,
     );
+    expect(popover?.getAttribute('style')).toContain(
+      '--astryx-layer-block-end-guttered-full-axis',
+    );
     expect(popover?.getAttribute('style')).not.toContain('span-all');
     expect(popover).toHaveStyle(
       'min-width: min(anchor-size(width),calc(100vi - max(var(--spacing-4),env(safe-area-inset-left,0px)) - max(var(--spacing-4),env(safe-area-inset-right,0px))))',

@@ -22,7 +22,7 @@
  * item reads as pre-selected, and the first ArrowDown then moves to item 1.
  *
  * SYNC: When modified, update these files to stay in sync:
- * - /packages/core/src/DropdownMenu/DropdownMenu.position-try.css
+ * - /packages/core/src/Layer/layerPositionTry.css
  * - /packages/core/src/DropdownMenu/DropdownMenu.doc.mjs
  * - /packages/core/src/DropdownMenu/DropdownMenu.test.tsx
  * - /packages/core/src/DropdownMenu/index.ts
@@ -70,7 +70,7 @@ import {MenuBottomSheet} from './MenuBottomSheet';
 import {MenuBottomSheetActionList} from './MenuBottomSheetActionList';
 import {layerAnimations} from '../Layer/layerAnimations.stylex';
 import {
-  getPositionTryFallbacks,
+  getGutteredPositionTryFallbacks,
   type LayerAlignment,
   type LayerPlacement,
 } from '../Layer/useLayer';
@@ -100,26 +100,6 @@ const MENU_INLINE_EDGE_GUTTER = `max(${MENU_VIEWPORT_GUTTER}, env(safe-area-inse
 const MENU_BLOCK_START_EDGE_GUTTER = `max(${MENU_VIEWPORT_GUTTER}, env(safe-area-inset-top, 0px))`;
 const MENU_BLOCK_END_EDGE_GUTTER = `max(${MENU_VIEWPORT_GUTTER}, env(safe-area-inset-bottom, 0px))`;
 const MENU_TRIGGER_OPEN_BACKGROUND = `linear-gradient(${colorVars['--color-overlay-pressed']}, ${colorVars['--color-overlay-pressed']})`;
-
-const MENU_BLOCK_START_FULL_AXIS_TRY = '--astryx-menu-block-start-full-axis';
-const MENU_BLOCK_END_FULL_AXIS_TRY = '--astryx-menu-block-end-full-axis';
-const MENU_INLINE_START_FULL_AXIS_TRY = '--astryx-menu-inline-start-full-axis';
-const MENU_INLINE_END_FULL_AXIS_TRY = '--astryx-menu-inline-end-full-axis';
-
-function getMenuFullAxisFallbacks(
-  placement: LayerPlacement,
-): readonly [string, string] {
-  switch (placement) {
-    case 'above':
-      return [MENU_BLOCK_START_FULL_AXIS_TRY, MENU_BLOCK_END_FULL_AXIS_TRY];
-    case 'below':
-      return [MENU_BLOCK_END_FULL_AXIS_TRY, MENU_BLOCK_START_FULL_AXIS_TRY];
-    case 'start':
-      return [MENU_INLINE_START_FULL_AXIS_TRY, MENU_INLINE_END_FULL_AXIS_TRY];
-    case 'end':
-      return [MENU_INLINE_END_FULL_AXIS_TRY, MENU_INLINE_START_FULL_AXIS_TRY];
-  }
-}
 
 const styles = stylex.create({
   triggerOpen: {
@@ -982,10 +962,9 @@ function DropdownMenuPopover({
           alignment,
           offset: spacingVars['--spacing-1'],
           style: {
-            positionTryFallbacks: getPositionTryFallbacks(
+            positionTryFallbacks: getGutteredPositionTryFallbacks(
               placement,
               alignment,
-              getMenuFullAxisFallbacks(placement),
             ),
           },
           xstyle: [

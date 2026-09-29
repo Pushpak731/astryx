@@ -23,6 +23,7 @@ import {
   useKeepLayerOpenProps,
   useLayer,
   useLayerInternal,
+  getGutteredPositionTryFallbacks,
   getPositionTryFallbacks,
 } from './useLayer';
 import {typeScaleVars} from '../theme/tokens.stylex';
@@ -344,6 +345,17 @@ describe('getPositionTryFallbacks (issue #3671)', () => {
     expect(layerEl).not.toBeNull();
     expect(layerEl.style.positionTryFallbacks).toBe(
       `${FLIPS}, self-block-start span-self-inline-start, self-block-start span-self-inline-end, self-block-end span-self-inline-start, self-block-end span-self-inline-end, self-block-start span-all, self-block-end span-all`,
+    );
+  });
+});
+
+describe('getGutteredPositionTryFallbacks', () => {
+  it('keeps ordinary flips first and uses Layer-owned named guttered tries last', () => {
+    expect(getGutteredPositionTryFallbacks('below', 'start')).toBe(
+      'flip-block, flip-inline, flip-block flip-inline, --astryx-layer-block-end-guttered-full-axis, --astryx-layer-block-start-guttered-full-axis',
+    );
+    expect(getGutteredPositionTryFallbacks('start', 'center')).toContain(
+      '--astryx-layer-inline-start-guttered-full-axis, --astryx-layer-inline-end-guttered-full-axis',
     );
   });
 });

@@ -127,6 +127,27 @@ prevent a viable alignment or side fallback. When natural block size fits on
 neither side, the component may choose the roomier side, constrain the surface,
 and expose its overflow through the component's scrolling contract.
 
+Layer also provides package-internal named full-axis tries with physical safe-area
+margins for viewport-constrained owners. Opting into those tries changes only the
+last fallback geometry: it does not assign width, maximum size, or scrolling to
+Layer. DropdownMenu, Popover, BaseTypeahead, and PowerSearch remain the current
+sizing owners that combine those tries with their own safe-viewport constraints:
+DropdownMenu, Popover, BaseTypeahead, PowerSearch, and TopNavMegaMenu. Direct `usePopover`/`useLayer` consumers without a candidate-relative size cap,
+including Selector-family surfaces, HoverCard, Tooltip, and keyboard hints, keep
+the standard fallback list and their existing component-owned or intrinsic size.
+
+### Anchored sizing-owner ledger
+
+| Runtime path                                                 | Sizing owner              | Preserve-before-contain responsibility                                                                                                                            |
+| ------------------------------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| DropdownMenu root popover                                    | DropdownMenu              | Preserve `menuWidth` or intrinsic width while a safe candidate fits; own menu scrolling and viewport caps.                                                        |
+| Popover component                                            | Popover                   | Preserve explicit width or trigger-matched minimum width through ordered fallbacks; own measured overflow and scrolling.                                          |
+| BaseTypeahead, including Typeahead and Tokenizer composition | BaseTypeahead             | Preserve intrinsic or numeric result width through ordered fallbacks; own result-list scrolling.                                                                  |
+| PowerSearch editor                                           | PowerSearch               | Preserve its 400 px editor floor through ordered fallbacks; yield only when the safe viewport cannot contain it.                                                  |
+| TopNavMegaMenu                                               | TopNavMegaMenu            | Preserve requested block size through below, above, and full-axis fallbacks; own panel scrolling and the safe-viewport block cap.                                 |
+| Selector, MultiSelector, and ComplexSelector popovers        | Selector-family component | Match the trigger minimum without a candidate-relative cap; inherit Layer fallback order without a separate sizing change. Bottom-sheet presentation is separate. |
+| HoverCard, Tooltip, and keyboard hints                       | Owning surface/content    | Keep intrinsic or component-capped content on the ordinary Layer path; no candidate-relative clamp participates.                                                  |
+
 ### Current browser support behavior
 
 Native Popover API plus CSS Anchor Positioning provide the complete behavior
@@ -288,9 +309,11 @@ layers use Layer rendering without joining Escape/platform dismissal.
   Trigger-associated layers resolve near their JSX position independently of the
   provider.
 - **INV11 — Position fallbacks precede size containment.** Component-owned sizing
-  preserves a surface's natural or requested size while an ordered fallback can
-  fit it within the safe viewport, and constrains the surface only when no
-  candidate can fit that size.
+  preserves a surface's natural or requested size through same-side alignment,
+  opposite-side, and full-axis fallback candidates while any candidate can fit it
+  within the safe viewport. Only after no candidate fits may the component's
+  viewport constraint reduce that size. Layer owns the ordering and reusable
+  guttered full-axis tries; the component still owns size and scrolling.
 
 This record does not make future eligible-owner, branch-association, global-host,
 or browser-support requirements current. It does not own component focus entry or

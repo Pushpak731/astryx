@@ -41,10 +41,7 @@ const TARGETS = {
     banner: 'Astryx Pre-compiled StyleX CSS — all components',
     aliases: {},
     rawCss: [
-      path.resolve(
-        ROOT,
-        'packages/core/src/DropdownMenu/DropdownMenu.position-try.css',
-      ),
+      path.resolve(ROOT, 'packages/core/src/Layer/layerPositionTry.css'),
     ],
   },
   lab: {
