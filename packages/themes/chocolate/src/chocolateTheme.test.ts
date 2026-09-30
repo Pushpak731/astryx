@@ -9,8 +9,8 @@ describe('chocolate touch + narrow type pin', () => {
     const rule = chocolateTheme.__adaptationRules?.[0];
 
     expect(chocolateTheme.__adaptations.rules).toHaveLength(1);
-    expect(rule?.when).toEqual({pointer: 'coarse', width: {below: 'md'}});
-    expect(rule?.query).toBe('(width < 768px) and (pointer: coarse)');
+    expect(rule?.when).toEqual({pointer: 'coarse', width: {below: 'lg'}});
+    expect(rule?.query).toBe('(width < 1024px) and (pointer: coarse)');
     // Pinned ladder: base 16 (was 14), ratio 1.2 -> 1.1736, Display 1 pinned.
     expect(rule?.tokens['--font-size-base']).toBe('1rem');
     expect(rule?.tokens['--font-size-lg']).toBe('1.1875rem');
@@ -19,7 +19,7 @@ describe('chocolate touch + narrow type pin', () => {
     expect(chocolateTheme.tokens['--font-size-base']).toBe('0.875rem');
     expect(chocolateTheme.tokens['--font-size-5xl']).toBe('2.625rem');
     expect(generateThemeCSS(chocolateTheme).component).toContain(
-      '@media (width < 768px) and (pointer: coarse)',
+      '@media (width < 1024px) and (pointer: coarse)',
     );
   });
 });

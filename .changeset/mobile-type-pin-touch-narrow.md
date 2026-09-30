@@ -7,7 +7,7 @@
 
 [feat] Touch + narrow typography (Pin model) for the 14px-base first-party themes
 
-Under `@media (width < 768px) and (pointer: coarse)`, neutral and chocolate
+Under `@media (width < 1024px) and (pointer: coarse)`, neutral and chocolate
 (base 14, ratio 1.2) and butter and stone (base 14, ratio 1.25) now floor
 their type base to 16px and re-derive the ratio so Display 1 holds its
 desktop size (1.2 -> 1.1736, 1.25 -> 1.2225). Body, label and code rise

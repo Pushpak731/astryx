@@ -61,7 +61,7 @@ export const chocolateTheme = defineTheme({
   adaptations: {
     rules: [
       {
-        when: {pointer: 'coarse', width: {below: 'md'}},
+        when: {pointer: 'coarse', width: {below: 'lg'}},
         value: {typography: {scale: {base: 16, ratio: 1.1736}}},
       },
     ],
