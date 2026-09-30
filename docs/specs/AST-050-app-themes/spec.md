@@ -245,8 +245,9 @@ its own output; and a new configuration file.
 
 A fixed export path lets any app import a theme with any CLI version, or with no
 CLI. It adds no descriptor field, so no released CLI meets an unknown field. The
-single-theme `./built` and `./theme.css` form is the one every published
-first-party theme package already has, so those packages need no new release.
+single-theme form keeps the `./built` and `./theme.css` export names that built
+theme packages already use, so an existing package can be added without a new
+release.
 
 Rejected: import paths declared in the theme descriptor, which older CLIs would
 reject as an unknown field.
@@ -277,8 +278,7 @@ single command several jobs.
 - **OQ1 — Where the module goes in a project without a source folder.** Whether
   a fixed default path is enough, or a project needs to choose it.
   (`human-design`)
-- **OQ2 — Fonts for first-party themes.** Six of the seven published first-party
-  themes name fonts that the app must load itself, so an app that switches to
-  one of them shows fallback fonts until it does. Whether those packages ship a
-  font stylesheet (FR7), and whether it serves the font files itself or loads
-  them from a font service. (`human-design`)
+- **OQ2 — How theme packages ship fonts.** A theme that names fonts it does not
+  load shows fallback fonts after a switch until the app loads them. Whether a
+  package's font stylesheet (FR7) serves the font files itself or loads them
+  from a font service. (`human-design`)
