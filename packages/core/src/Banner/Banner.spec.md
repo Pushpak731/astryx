@@ -9,7 +9,7 @@ superseded_by: null
 approved_by: cixzhang
 approved_at: 2026-09-07
 owners: [cixzhang, imdreamrunner]
-review_triggers: [public-api, layout, theming]
+review_triggers: [public-api, layout, theming, accessibility]
 verified_by:
   [
     packages/core/src/Banner/Banner.test.tsx,
