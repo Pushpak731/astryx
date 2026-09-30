@@ -63,7 +63,7 @@ describe('Banner alert binding — jsdom lane', () => {
 
   it('records the adjacent Banner states that keep separate owners', () => {
     expect(BANNER_ALERT_EXCLUSIONS.map(entry => entry.part)).toEqual([
-      'non-live visual statuses',
+      'non-alert and status-to-role selection',
       'disclosure and action controls',
       'spoken announcement output and timing',
     ]);

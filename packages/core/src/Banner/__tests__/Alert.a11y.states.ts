@@ -68,10 +68,10 @@ export type BannerAlertBindingState = BannerAlertBindingDefinition & {
 
 export const BANNER_ALERT_EXCLUSIONS = [
   {
-    owner: 'Banner and the composing feature',
-    part: 'non-live visual statuses',
+    owner: 'component:Banner',
+    part: 'non-alert and status-to-role selection',
     reason:
-      'Info, success, warning, and error paint do not by themselves decide interruption urgency; only states that explicitly request role=alert bind here.',
+      'This binding starts after Banner has resolved the public role to alert. Its non-alert states and status-to-role selection remain component-owned.',
   },
   {
     owner: 'Button, Disclosure, and Banner',
