@@ -157,7 +157,8 @@ Consumer prop syntax and examples remain in
 
 - **AR1 — Assistive strings use the same resolution contract.** `aria-label`,
   `title`, live announcements, and other AT-facing Astryx strings MUST use the
-  active translator and remain strings.
+  active translator and remain strings; assembling them from fragments or
+  hand-rolled plurals is a bypass under `architecture:internationalization/INV1a`.
 - **AR2 — Missing translations remain usable.** Expected non-English gaps MUST
   fall back to meaningful English rather than remove an accessible name or
   announcement.
