@@ -1,4 +1,5 @@
 ---
+'@astryxdesign/build': patch
 '@astryxdesign/cli': patch
 ---
 
