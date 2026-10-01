@@ -27,18 +27,21 @@ switch between themes at runtime, and know that the setup is correct.
 
 Today `astryx theme add` copies a theme's source into the app, as a template
 does. A copied theme no longer receives its owner's updates, loses its package
-identity, and must be built again by the app. Nothing tracks which themes an app
-uses, nothing helps it switch between them, and doctor checks only that a
-first-party theme package is installed.
+identity, and must be built again by the app. It also loses any stylesheet its
+package loads beside it, such as its fonts, so it can render in fallback fonts
+with no error. Nothing tracks which themes an app uses, nothing helps it switch
+between them, and doctor checks only that a first-party theme package is
+installed.
 
 This record owns how an app declares, imports, switches, and checks its themes
-through the CLI. The rule is the same for every theme: the app imports a built
-theme and passes it to `Theme`. `architecture:theme-application` already
-supports several built themes on one page, because built theme CSS is scoped to
-the theme's name and switching changes only the active identity.
-`spec:AST-017` owns compatibility and response fields, `spec:AST-042` owns
-command admission, `spec:AST-040` owns writes to consumer files, and
-`spec:AST-039` owns how integration items are described.
+through the CLI. The rule is the same for every theme: an app uses a theme by
+importing its built form and passing it to `Theme`, and customizes it by
+extending that theme. Copying a theme's source is an explicit author fork.
+`architecture:theme-application` already supports several built themes on one
+page, because built theme CSS is scoped to the theme's name and switching
+changes only the active identity. `spec:AST-017` owns compatibility and response
+fields, `spec:AST-042` owns command admission, `spec:AST-040` owns writes to
+consumer files, and `spec:AST-039` owns how integration items are described.
 
 ## Non-goals
 
@@ -49,6 +52,8 @@ command admission, `spec:AST-040` owns writes to consumer files, and
 - Finding themes that are not installed.
 - Changing how a theme is authored, compiled, or applied at runtime.
 - Merging or renaming the first-party theme packages.
+- Making theme source CLI-owned. The generated module only imports and lists the
+  app's themes; every theme's source stays with its author.
 - Reading the 0.6 theme catalog (`themes/manifest.json`). A package moves to
   typed descriptors with the migration that ships in the next release
   (`spec:AST-039/FR10`); this record adds no catalog reader.
@@ -88,7 +93,7 @@ command admission, `spec:AST-040` owns writes to consumer files, and
   the module path; and the change the command made. Text output shows the same
   facts. The first `theme add` in a project also shows the one-time wiring: import
   the module and pass the default theme to `Theme`.
-- **FR6 — Ejecting keeps the copy.**
+- **FR6 — Ejecting is the author fork.**
   `theme eject <slug> [path] [--package <package>]` MUST copy a theme's complete
   source directory into the project
   exactly as `theme add` copied it before this record: the same files, path
@@ -199,15 +204,17 @@ unchanged.
 
 ## Decision log
 
-### DEC-1 — A theme is imported, not copied
+### DEC-1 — Consumers import; copying is an author fork
 
 **Reference:** `spec:AST-050/DEC-1`
 **Decider:** `josephfarina`, `2026-09-30`
 
 A theme an app uses is a dependency, like a component library: it keeps its
-owner's updates and its identity. Copying is how a template starts a page, not
-how an app uses a theme. `theme add` therefore imports, and copying becomes the
-explicit `theme eject`.
+owner's updates, its identity, and the stylesheets its package loads beside it.
+An app customizes a theme by extending it. Copying is how a template starts a
+page and how an author forks a theme, not how an app uses one. Consumer
+`theme add` therefore imports, and source copying moves to the explicit author
+fork, `theme eject`.
 
 Rejected: keeping `theme add` as a copy and adding a new verb for importing,
 which leaves the obvious command doing the wrong thing for most builders.
