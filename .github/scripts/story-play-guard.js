@@ -39,9 +39,21 @@ const port = Number(getArg('port') || 6010);
 // whole cost of promoting its play function into required CI.
 const TARGETS = [
   {
+    component: 'useContainerReveal',
+    story: 'core-hooks-usecontainerreveal--reveal',
+    guards: 'default reveal and exit have no transition duration or delay',
+  },
+  {
+    component: 'useContainerReveal',
+    story: 'core-hooks-usecontainerreveal--hover-intent-delay',
+    guards:
+      'explicit hoverDelay postpones pointer entry while exit stays immediate',
+  },
+  {
     component: 'Selector',
     story: 'core-selector--size-variants',
-    guards: 'compact trigger variants match their size tokens and multiline values grow',
+    guards:
+      'compact trigger variants match their size tokens and multiline values grow',
   },
   {
     component: 'MultiSelector',
