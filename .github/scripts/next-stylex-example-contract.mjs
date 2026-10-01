@@ -347,6 +347,9 @@ async function developmentContract(browser) {
       (await background()) === 'rgba(0, 0, 0, 0)',
       'HMR probe baseline is not transparent',
     );
+    // The first render can finish before Turbopack's filesystem watcher is
+    // subscribed. Let that watcher settle so the first mutation is observable.
+    await new Promise(resolve => setTimeout(resolve, 1_000));
 
     writeFileSync(
       hmrProbe,
