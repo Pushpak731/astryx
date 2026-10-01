@@ -48,6 +48,19 @@ describe('template.show', () => {
     expect(withFixtures).toBeGreaterThan(0);
   }, SLOW);
 
+  it('reports how many demo media references it replaced, 0 for none', () => {
+    const count = (/** @type {string} */ s) => s.split(FIXTURE).length - 1;
+    let reported = 0;
+    for (const match of templates) {
+      const raw = read(match.filePath);
+      const {source, demoMediaReplaced} = templateShow(match).data;
+      expect(demoMediaReplaced, match.dirName).toBe(count(raw) - count(source));
+      if (count(raw) === 0) expect(demoMediaReplaced, match.dirName).toBe(0);
+      reported += demoMediaReplaced;
+    }
+    expect(reported).toBeGreaterThan(0);
+  }, SLOW);
+
   it('prints a placeholder where a template shows a demo image', async () => {
     const match = templates.find(
       t => t.type === 'page' && FIXTURE_IMAGE.test(read(t.filePath)),
@@ -59,5 +72,6 @@ describe('template.show', () => {
     if (res.type !== 'template.show') return;
     expect(res.data.source).not.toContain(FIXTURE);
     expect(res.data.source).toContain('data:image/svg+xml,');
+    expect(res.data.demoMediaReplaced).toBeGreaterThan(0);
   }, SLOW);
 });

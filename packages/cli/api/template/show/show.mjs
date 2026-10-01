@@ -13,7 +13,7 @@ import {AstryxError} from '../../error.mjs';
 import {ERROR_CODES} from '../../../foundation/response/error-codes.mjs';
 import {
   extractComponents,
-  stripTemplateAssetRefs,
+  replaceDemoMedia,
 } from '../../../foundation/discovery/template-adapter.mjs';
 
 /**
@@ -30,6 +30,13 @@ export function templateShow(match) {
     );
   }
 
+  // The source template.copy writes (spec:AST-028 FR7): a template printed and
+  // pasted must not keep a media path only Astryx's previews serve, and the
+  // caller is told how many it replaced, the way the copy receipt tells it.
+  const {source, demoMediaReplaced} = replaceDemoMedia(
+    fs.readFileSync(match.filePath, 'utf-8'),
+  );
+
   return {
     type: 'template.show',
     data: {
@@ -37,11 +44,8 @@ export function templateShow(match) {
       description: match.description,
       type: match.type,
       components: extractComponents(match.filePath),
-      // The source template.copy writes (spec:AST-028 FR7): a template printed
-      // and pasted must not keep a media path only Astryx's previews serve.
-      source: stripTemplateAssetRefs(
-        fs.readFileSync(match.filePath, 'utf-8'),
-      ),
+      source,
+      demoMediaReplaced,
     },
   };
 }

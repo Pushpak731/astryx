@@ -349,6 +349,27 @@ export function stripTemplateAssetRefs(source) {
   return output + source.slice(copied);
 }
 
+/** The template-fixture namespace Astryx demo media lives under. */
+const FIXTURE_NAMESPACE = `/${FIXTURE_SEGMENT}/`;
+
+/** @param {string} source */
+const countFixtureRefs = source => source.split(FIXTURE_NAMESPACE).length - 1;
+
+/**
+ * Replace the Astryx demo media in template source with placeholders. A
+ * replaced reference leaves the fixture namespace, so the drop in count is
+ * exactly what a receipt must disclose.
+ * @param {string} source
+ * @returns {{source: string, demoMediaReplaced: number}}
+ */
+export function replaceDemoMedia(source) {
+  const output = stripTemplateAssetRefs(source);
+  return {
+    source: output,
+    demoMediaReplaced: countFixtureRefs(source) - countFixtureRefs(output),
+  };
+}
+
 /** @param {string | undefined} char */
 function isTokenDelimiter(char) {
   return char === undefined || /\s/u.test(char) || TOKEN_DELIMITERS.has(char);
