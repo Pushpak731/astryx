@@ -254,7 +254,7 @@ async function productionContract(browser) {
       const home = await page
         .locator('[data-product-stylex="home"]')
         .evaluate(element => ({
-          backgroundColor: getComputedStyle(element).backgroundColor,
+          display: getComputedStyle(element).display,
           className: element.className,
         }));
       const probe = await page
@@ -263,10 +263,7 @@ async function productionContract(browser) {
           padding: getComputedStyle(element).padding,
           className: element.className,
         }));
-      invariant(
-        home.backgroundColor !== 'rgba(0, 0, 0, 0)',
-        'server StyleX did not paint',
-      );
+      invariant(home.display === 'flex', 'home product StyleX did not paint');
       invariant(
         probe.padding === '4px',
         `client StyleX padding was ${probe.padding}`,
