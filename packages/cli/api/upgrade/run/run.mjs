@@ -288,6 +288,7 @@ export async function run(options = {}, {cwd = process.cwd()} = {}) {
             refreshed: false,
             action: 'none',
           },
+          sourcePathFound,
           filesChanged: coreResult?.totalFilesChanged ?? 0,
           transformsApplied: coreResult?.totalTransformsApplied ?? 0,
           modifiedFiles: uniqueFiles(coreResult?.changedFiles).map(file =>
