@@ -108,7 +108,7 @@ jobs:
             (
               cd "$POLICY_ROOT"
               printf '%s  %s\n' \
-                b3d8a3bb384b0eabf2eeadf730dba933f6f2ceb919d4b0fc7ba9cbe6d9c5ed77 .github/scripts/check-rtl-applicability-registries.mjs \
+                ee815c31da686a7f5492c91e5acb40d5aabdd06bfe9832d4d48ae5e92a67a96b .github/scripts/check-rtl-applicability-registries.mjs \
                 47e2a1b820f1cf11a6a825e625f1b6275fb2e8fe0c8a307ef098cde6b7d1059b apps/storybook/rtl-audit/rtl-audit.mjs \
                 d59db4e326aeb690481155f1fb41f741d5448f8a820ab6c6a053ece9c69307ff apps/storybook/rtl-audit/rtl-audit-coverage.mjs \
                 7d369000132c42f28679da7a65077ff20741d6935429fc848a40ca22b30ab1d3 scripts/component-packages.cjs \

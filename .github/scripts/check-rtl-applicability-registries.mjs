@@ -27,7 +27,7 @@ const {COMPONENT_PACKAGES} = componentPackages;
 const COMPONENT_SOURCE_PREFIXES = COMPONENT_PACKAGES.map(pkg => `${pkg.src}/`);
 
 const BASELINE_BOOTSTRAP_SHA256 =
-  '33c2a307ed8c797e5fe7dda8f2470fa452b3af942b91b04b7fc7b5bbc32b79a3';
+  'c21b0cad68325b21fa83290475e3008c9106d2d50626bd6348f2ee77cdadcbdf';
 
 const args = process.argv.slice(2);
 const getArg = name => {
