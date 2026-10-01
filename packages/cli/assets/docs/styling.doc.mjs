@@ -343,7 +343,7 @@ const styles = stylex.create({
       ],
     },
     {
-      title: 'StyleX Build Setup (product source only)',
+      title: 'StyleX Build Setup (required for swizzled components)',
   category: 'guide',
       content: [
         {
@@ -372,18 +372,24 @@ const styles = stylex.create({
           type: 'code',
           lang: 'js',
           label: 'postcss.config.js: product-only extraction',
-          code: `module.exports = {
+          code: `const babelConfig = require('./babel.config');
+
+module.exports = {
   plugins: {
     '@stylexjs/postcss-plugin': {
       cwd: __dirname,
       include: ['src/app/**/*.{js,jsx,ts,tsx}'],
-      exclude: ['**/node_modules/**', '../../packages/**/*'],
+      exclude: ['**/node_modules/**', '**/*.test.*', '**/*.stories.*'],
       useCSSLayers: {
         before: ['reset', 'astryx-base', 'astryx-theme'],
         prefix: 'product',
       },
-      // Reuse the same product-only StyleX plugin tuple as babel.config.js.
-      babelConfig: {babelrc: false, configFile: false, plugins: [stylexPlugin]},
+      babelConfig: {
+        babelrc: false,
+        configFile: false,
+        parserOpts: {plugins: ['typescript', 'jsx']},
+        plugins: babelConfig.plugins,
+      },
     },
   },
 };`,

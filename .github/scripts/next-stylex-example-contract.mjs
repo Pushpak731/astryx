@@ -214,7 +214,7 @@ async function productionContract(browser) {
     appDir,
   );
   try {
-    await waitForHttp(`http://127.0.0.1:${port}/`, server);
+    await waitForHttp(`http://localhost:${port}/`, server);
     const browserCases = [
       {
         name: 'desktop-light',
@@ -246,7 +246,7 @@ async function productionContract(browser) {
         viewport: browserCase.viewport,
         colorScheme: browserCase.colorScheme,
       });
-      await page.goto(`http://127.0.0.1:${port}/`, {
+      await page.goto(`http://localhost:${port}/`, {
         waitUntil: 'domcontentloaded',
       });
       await page.locator('[data-server-route="home"]').waitFor();
@@ -280,7 +280,7 @@ async function productionContract(browser) {
         fullPage: true,
       });
 
-      await page.goto(`http://127.0.0.1:${port}/details`, {
+      await page.goto(`http://localhost:${port}/details`, {
         waitUntil: 'domcontentloaded',
       });
       await page.locator('[data-server-route="details"]').waitFor();
@@ -334,9 +334,9 @@ async function developmentContract(browser) {
     appDir,
   );
   try {
-    await waitForHttp(`http://127.0.0.1:${port + 1}/`, server);
+    await waitForHttp(`http://localhost:${port + 1}/`, server);
     const page = await browser.newPage({viewport: {width: 1024, height: 768}});
-    await page.goto(`http://127.0.0.1:${port + 1}/`, {
+    await page.goto(`http://localhost:${port + 1}/`, {
       waitUntil: 'domcontentloaded',
     });
     const probe = page.locator('[data-hmr-probe]');
