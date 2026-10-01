@@ -176,6 +176,12 @@ function describeCommand(cmd, root, jsonSupported) {
   const examples = (docs?.doc.examples ?? []).map(e => e.cli);
   if (examples.length > 0) entry.examples = examples;
 
+  const exitCodes = (docs?.doc.exitCodes ?? []).map(({code, when}) => ({
+    code,
+    when,
+  }));
+  if (exitCodes.length > 0) entry.exitCodes = exitCodes;
+
   // Sort subcommands by name for a stable, agent-facing contract — the same
   // guarantee the top-level command list makes. Otherwise Commander
   // registration order leaks into the manifest and a pure reorder of
