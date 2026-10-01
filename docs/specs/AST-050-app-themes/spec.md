@@ -54,6 +54,8 @@ consumer files, and `spec:AST-039` owns how integration items are described.
 - Merging or renaming the first-party theme packages.
 - Making theme source CLI-owned. The generated module only imports and lists the
   app's themes; every theme's source stays with its author.
+- How a font stylesheet delivers its fonts. Font files in the package and a font
+  service both satisfy FR7; the package chooses.
 - Reading the 0.6 theme catalog (`themes/manifest.json`). A package moves to
   typed descriptors with the migration that ships in the next release
   (`spec:AST-039/FR10`); this record adds no catalog reader.
@@ -64,24 +66,31 @@ consumer files, and `spec:AST-039` owns how integration items are described.
 ## Requirements
 
 - **FR1 — Adding a theme imports it.** `theme add <slug> [--package <package>]`
-  MUST make the theme part of the app by recording it in the app's theme state
+  MUST make the theme part of the app by adding it to the app's theme record
   (FR3) and regenerating the app's theme module (FR2). It MUST NOT copy theme
   source into the project and MUST NOT edit application code. Adding a theme
   that is already added regenerates the module and reports no change.
 - **FR2 — One generated theme module.** The CLI MUST keep one module that
   imports each added theme's built module and stylesheet, and exports every
   added theme keyed by slug, a type naming the slugs, and the default slug. The
-  module carries a generated marker, and the CLI regenerates it from the theme
-  state instead of editing it (`spec:AST-040/FR5`). The module is TypeScript when
-  the project uses TypeScript and JavaScript otherwise. When the module path
-  holds a file the CLI did not generate, the command MUST fail before writing
-  and name that file.
-- **FR3 — The app declares its themes in package.json.** `astryx.themes` in the
-  project's `package.json` maps each slug to its owner: a package name, or the
-  project's local themes root. `astryx.theme` names the default slug and MUST be
-  one of the added slugs. Without `astryx.themes`, an existing `astryx.theme`
-  keeps its released meaning. The CLI reads theme state from these fields only;
-  no environment variable selects a theme (`spec:AST-017/FR14`).
+  module carries a generated marker, and the CLI regenerates the whole module
+  instead of editing it (`spec:AST-040/FR5`). The module is TypeScript when the
+  project uses TypeScript and JavaScript otherwise. It has one fixed home:
+  `astryx-themes.ts` or `astryx-themes.js` in the project's `src` folder when
+  the project has one, and otherwise in the project root. A module that already
+  exists stays where it is, even when the project gains or loses a `src` folder.
+  No configuration chooses the home (`spec:AST-017/FR19`). When the home holds a
+  file the CLI did not generate, or more than one generated theme module exists,
+  the command MUST fail before writing and name the files.
+- **FR3 — The module is the app's theme record.** The theme module records each
+  added theme's slug and owner, a package name or the project's local themes
+  root, and the default slug, in a form the CLI reads without running the
+  module. `theme add`, `theme remove`, and `theme use` read that record, change
+  it, and regenerate the module. The default MUST be one of the added themes. No
+  `package.json` field, configuration key, or environment variable records or
+  selects the app's themes (`spec:AST-017/FR14`, `spec:AST-017/FR19`). In a
+  project with no theme module, an existing `astryx.theme` field keeps its
+  released meaning.
 - **FR4 — The set and the default are managed by command.**
   `theme remove <slug>` removes a theme from the app, and `theme use <slug>`
   makes an added theme the default. Removing the default theme MUST fail and
@@ -104,16 +113,19 @@ consumer files, and `spec:AST-039` owns how integration items are described.
   stylesheet at `./themes/<slug>.css`. A package that owns exactly one theme MAY
   instead export `./built` and `./theme.css`. When a theme needs fonts that
   are not system fonts, the package SHOULD export a font stylesheet at
-  `./themes/<slug>.fonts.css`, or `./fonts.css` for a single theme. `theme add`
+  `./themes/<slug>.fonts.css`, or `./fonts.css` for a single theme. The font
+  stylesheet owns loading its fonts: it may ship the font files with
+  `@font-face` rules or import them from a font service. `theme add`
   MUST fail, naming what is missing, when a theme has no resolvable built module
   and stylesheet; it never falls back to copying or to runtime source.
   `integration add theme` MUST write these exports, and
-  `integration pack --check` MUST fail when an exported theme module or
-  stylesheet does not resolve from the packed tarball or does not match its
-  source.
-- **FR8 — Local themes are added like package themes.** A theme directory in the
-  project's local themes root, with the same shape as an integration theme,
-  is listed and added like a package theme. Its built module and stylesheet are
+  `integration pack --check` MUST fail when an exported theme module,
+  stylesheet, or font stylesheet does not resolve from the packed tarball, or
+  when a built module or stylesheet does not match its source.
+- **FR8 — Local themes are added like package themes.** The project's local
+  themes root is the folder `theme eject` copies into by default. A theme
+  directory there, with the same shape as an integration theme, is listed and
+  added like a package theme. Its built module and stylesheet are
   the files `theme build` writes beside its source. `theme add` MUST fail and
   name the build command when they are missing.
 - **FR9 — The module imports built themes only.** The generated module MUST
@@ -127,8 +139,8 @@ consumer files, and `spec:AST-039` owns how integration items are described.
   on positive evidence:
   1. every added theme's owner is installed and its module and stylesheet
      resolve from the project;
-  2. the theme module exists, carries the CLI's generated marker, and matches
-     the theme state;
+  2. the theme module exists, carries the CLI's generated marker, and is exactly
+     what the CLI generates from the record it carries;
   3. project source imports the theme module (a warning when this cannot be
      shown);
   4. no built theme module is imported without its stylesheet;
@@ -139,7 +151,8 @@ consumer files, and `spec:AST-039` owns how integration items are described.
   8. the default theme is one of the added themes;
   9. every font family an added theme names is a system font or is loaded by a
      font stylesheet the module imports (a warning that names the family when
-     this cannot be shown);
+     this cannot be shown, as when the stylesheet imports its fonts from a font
+     service);
   10. no two added themes write different rules outside their own theme scope
       for the same selector, because every added stylesheet loads at once.
 
@@ -181,7 +194,8 @@ When this ships:
   checks them;
 - doctor's theme check is replaced by FR11;
 - the CLI stops reading the `ASTRYX_THEME` environment variable, and the
-  `component` command reads the default theme from the theme state;
+  `component` command reads the default theme from the theme module's record, or
+  from `astryx.theme` in a project with no theme module;
 - the theme guide, the integration guide, agent docs, and `init` next steps move
   to the FR13 workflow.
 
@@ -190,17 +204,17 @@ unchanged.
 
 ## Verification
 
-| Contract  | Verification                                   | Representative states                                                         | Mutation or failure expectation                                                            |
-| --------- | ---------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| FR1, FR2  | Theme command tests and a real consumer        | first add; repeat add; hand-written file at the module path; no TypeScript    | Source is copied, app code changes, a repeat add changes files, or a user file is replaced |
-| FR3, FR4  | Theme state tests                              | add, remove, use; removing the default; using a theme not added; legacy state | The default is not an added theme, or legacy `astryx.theme` stops resolving                |
-| FR5, FR12 | Response type, text field, and docs tests      | every command; first add; JSON callers                                        | `theme.add` is emitted, a field has no text projection, or a doc still says add copies     |
-| FR6       | Eject tests against the former copy fixtures   | bundled, integration, and nested-file themes                                  | Ejected bytes or receipt fields differ from the former copy                                |
-| FR7, FR8  | Pack check and real provider-to-consumer tests | multi-theme package; single-theme package; missing export; stale build        | A theme without a resolvable built module is added, or pack check passes a stale export    |
-| FR9       | Generated module tests                         | package and local themes                                                      | The module imports source                                                                  |
-| FR10      | List tests                                     | added, default, bundled, package, local                                       | A listed theme lacks its app fields                                                        |
-| FR11      | Doctor tests, one planted fault per check      | each of the ten faults; a correct app                                         | A check passes on its fault, or passes without positive evidence                           |
-| FR13      | Docs and agent-docs tests                      | theme guide, integration guide, agent block, init next steps                  | A surface teaches copying as the way to use a theme                                        |
+| Contract  | Verification                                   | Representative states                                                                                                             | Mutation or failure expectation                                                                                                                                |
+| --------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR1, FR2  | Theme command tests and a real consumer        | first add; repeat add; hand-written file at the module home; no TypeScript; no `src` folder; `src` added later                    | Source is copied, app code changes, a repeat add changes files, a user file is replaced, or an existing module moves                                           |
+| FR3, FR4  | Theme record tests                             | add, remove, use; removing the default; using a theme not added; a hand-edited module; two modules; no module with `astryx.theme` | The default is not an added theme, a hand-edited or second module is overwritten, theme state is written outside the module, or `astryx.theme` stops resolving |
+| FR5, FR12 | Response type, text field, and docs tests      | every command; first add; JSON callers                                                                                            | `theme.add` is emitted, a field has no text projection, or a doc still says add copies                                                                         |
+| FR6       | Eject tests against the former copy fixtures   | bundled, integration, and nested-file themes                                                                                      | Ejected bytes or receipt fields differ from the former copy                                                                                                    |
+| FR7, FR8  | Pack check and real provider-to-consumer tests | multi-theme package; single-theme package; missing export; font stylesheet missing from the tarball; stale build                  | A theme without a resolvable built module is added, or pack check passes a stale or missing export                                                             |
+| FR9       | Generated module tests                         | package and local themes                                                                                                          | The module imports source                                                                                                                                      |
+| FR10      | List tests                                     | added, default, bundled, package, local                                                                                           | A listed theme lacks its app fields                                                                                                                            |
+| FR11      | Doctor tests, one planted fault per check      | each of the ten faults; a correct app                                                                                             | A check passes on its fault, or passes without positive evidence                                                                                               |
+| FR13      | Docs and agent-docs tests                      | theme guide, integration guide, agent block, init next steps                                                                      | A surface teaches copying as the way to use a theme                                                                                                            |
 
 ## Decision log
 
@@ -227,23 +241,29 @@ which leaves the obvious command doing the wrong thing for most builders.
 An app wires one module once. After that, adding, removing, and choosing themes
 changes only files the CLI generates, so no command needs proof that it may
 change application source, and a switcher reads every added theme from one
-export.
+export. The module has one fixed home that never moves, so the app's import
+keeps working and nothing has to be set to find it.
 
 Rejected: editing the app's root component on every add, which needs a source
-transform for every framework; and printing import lines only, which leaves the
-app to keep the list of themes by hand.
+transform for every framework; printing import lines only, which leaves the app
+to keep the list of themes by hand; and a configurable module path, which
+`spec:AST-017/FR19` admits only for a case where the fixed home fails.
 
-### DEC-3 — Theme state lives in package.json
+### DEC-3 — The generated module is the record
 
 **Reference:** `spec:AST-050/DEC-3`
-**Decider:** `josephfarina`, `2026-09-30`
+**Decider:** `josephfarina`, `2026-10-01`
 
-Released CLIs reject unknown `astryx.config` keys, so new configuration there
-would break projects that also run an older CLI. `package.json` already carries
-`astryx.theme`, which older CLIs read loosely.
+The module already names every added theme, where it comes from, and the
+default. A second record elsewhere would duplicate a value the CLI can read from
+its own output, which `spec:AST-017/FR19` forbids, and would add a public field
+that every app has to keep in step with the module.
 
-Rejected: the generated module as the only record, which makes the CLI parse
-its own output; and a new configuration file.
+Rejected: an `astryx.themes` field in `package.json`, which duplicates the
+module and becomes permanent public surface with no case where reading the
+module fails; a key in `astryx.config`, which released CLIs reject as unknown;
+and detecting themes from application source, which cannot tell a theme an app
+uses from one it only mentions.
 
 ### DEC-4 — Packages expose themes through their exports
 
@@ -282,10 +302,4 @@ single command several jobs.
 
 ## Open questions
 
-- **OQ1 — Where the module goes in a project without a source folder.** Whether
-  a fixed default path is enough, or a project needs to choose it.
-  (`human-design`)
-- **OQ2 — How theme packages ship fonts.** A theme that names fonts it does not
-  load shows fallback fonts after a switch until the app loads them. Whether a
-  package's font stylesheet (FR7) serves the font files itself or loads them
-  from a font service. (`human-design`)
+None.
