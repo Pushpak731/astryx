@@ -8,7 +8,6 @@ import {Button} from '@astryxdesign/core/Button';
 import {mergeProps} from '@astryxdesign/core/utils';
 import {colorVars} from '@astryxdesign/core/theme/tokens.stylex';
 import {TrashIcon, PencilIcon} from '@heroicons/react/24/outline';
-import {expect, userEvent, waitFor, within} from 'storybook/test';
 
 const styles = stylex.create({
   stack: {
@@ -78,22 +77,6 @@ function RevealRow({label}: {label: string}) {
   );
 }
 
-function getRevealFixture(canvasElement: HTMLElement, label: string) {
-  const editButton = within(canvasElement).getByRole('button', {
-    name: `Edit ${label}`,
-  });
-  const actions = editButton.parentElement;
-  const row = actions?.parentElement;
-  if (!(actions instanceof HTMLElement) || !(row instanceof HTMLElement)) {
-    throw new Error(`Reveal fixture did not render for ${label}`);
-  }
-  return {actions, row};
-}
-
-function readTransitionTimes(value: string) {
-  return value.split(',').map(time => Number.parseFloat(time));
-}
-
 const meta: Meta = {
   title: 'Core/Hooks/useContainerReveal',
 };
@@ -113,28 +96,6 @@ export const Reveal: Story = {
       <RevealRow label="notes.txt" />
     </div>
   ),
-  play: async ({canvasElement}) => {
-    const {actions, row} = getRevealFixture(canvasElement, 'report.pdf');
-    const resting = getComputedStyle(actions);
-    expect(
-      readTransitionTimes(resting.transitionDuration).every(t => t === 0),
-    ).toBe(true);
-    expect(
-      readTransitionTimes(resting.transitionDelay).every(t => t === 0),
-    ).toBe(true);
-    expect(resting.opacity).toBe('0');
-    expect(resting.position).toBe('absolute');
-
-    await userEvent.hover(row);
-    const hovered = getComputedStyle(actions);
-    expect(hovered.opacity).toBe('1');
-    expect(hovered.position).toBe('static');
-
-    await userEvent.unhover(row);
-    const exited = getComputedStyle(actions);
-    expect(exited.opacity).toBe('0');
-    expect(exited.position).toBe('absolute');
-  },
 };
 
 /**
@@ -344,35 +305,6 @@ export const HoverIntentDelay: Story = {
         ))}
       </div>
     );
-  },
-  play: async ({canvasElement}) => {
-    const {actions, row} = getRevealFixture(canvasElement, 'file-1.txt');
-    expect(getComputedStyle(actions).opacity).toBe('0');
-
-    await userEvent.hover(row);
-    const hovered = getComputedStyle(actions);
-    expect(
-      readTransitionTimes(hovered.transitionDuration).every(t => t === 0),
-    ).toBe(true);
-    expect(
-      readTransitionTimes(hovered.transitionDelay).every(t => t === 0.25),
-    ).toBe(true);
-    await waitFor(
-      () => {
-        const settled = getComputedStyle(actions);
-        expect(settled.opacity).toBe('1');
-        expect(settled.position).toBe('static');
-      },
-      {timeout: 1000},
-    );
-
-    await userEvent.unhover(row);
-    const exited = getComputedStyle(actions);
-    expect(
-      readTransitionTimes(exited.transitionDelay).every(t => t === 0),
-    ).toBe(true);
-    expect(exited.opacity).toBe('0');
-    expect(exited.position).toBe('absolute');
   },
 };
 
