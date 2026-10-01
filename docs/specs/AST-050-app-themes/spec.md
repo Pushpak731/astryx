@@ -69,7 +69,9 @@ consumer files, and `spec:AST-039` owns how integration items are described.
   MUST make the theme part of the app by adding it to the app's theme record
   (FR3) and regenerating the app's theme module (FR2). It MUST NOT copy theme
   source into the project and MUST NOT edit application code. Adding a theme
-  that is already added regenerates the module and reports no change.
+  that is already added regenerates the module and reports no change. Adding a
+  slug that is already added from a different owner switches it to the new owner
+  and reports that change.
 - **FR2 — One generated theme module.** The CLI MUST keep one module that
   imports each added theme's built module and stylesheet, and exports every
   added theme keyed by slug, a type naming the slugs, and the default slug. The
@@ -104,10 +106,12 @@ consumer files, and `spec:AST-039` owns how integration items are described.
   the module and pass the default theme to `Theme`.
 - **FR6 — Ejecting is the author fork.**
   `theme eject <slug> [path] [--package <package>]` MUST copy a theme's complete
-  source directory into the project
-  exactly as `theme add` copied it before this record: the same files, path
-  safety, overwrite rule, and rollback. It returns the former copy fields as the
-  `theme.eject` response. An ejected theme is a local theme (FR8).
+  source directory into the project as `theme add` copied it before this record,
+  with the same path safety, overwrite rule, and rollback. It MUST also copy the
+  theme's same-stem descriptor (`spec:AST-039`), so the ejected theme is a
+  discoverable local theme (FR8). The copy MUST NOT describe itself as
+  maintained by the theme's original owner. It returns the former copy fields as
+  the `theme.eject` response, with the descriptor in its file list.
 - **FR7 — A package exposes each theme to import.** A package makes a theme
   importable by exporting its built module at `./themes/<slug>` and its
   stylesheet at `./themes/<slug>.css`. A package that owns exactly one theme MAY
@@ -125,9 +129,11 @@ consumer files, and `spec:AST-039` owns how integration items are described.
 - **FR8 — Local themes are added like package themes.** The project's local
   themes root is the folder `theme eject` copies into by default. A theme
   directory there, with the same shape as an integration theme, is listed and
-  added like a package theme. Its built module and stylesheet are
-  the files `theme build` writes beside its source. `theme add` MUST fail and
-  name the build command when they are missing.
+  added like a package theme. Its built module and stylesheet are the files
+  `theme build` writes beside its source. `theme add` MUST fail and name the
+  build command when they are missing. When a local theme and a package theme
+  share a slug, `theme add <slug>` adds the local theme unless `--package` names
+  the package, and `theme list` shows both with their owners.
 - **FR9 — The module imports built themes only.** The generated module MUST
   import built themes, their stylesheets, and their font stylesheets when the
   package exports one, never theme source for runtime style injection, so every
@@ -204,17 +210,17 @@ unchanged.
 
 ## Verification
 
-| Contract  | Verification                                   | Representative states                                                                                                             | Mutation or failure expectation                                                                                                                                |
-| --------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| FR1, FR2  | Theme command tests and a real consumer        | first add; repeat add; hand-written file at the module home; no TypeScript; no `src` folder; `src` added later                    | Source is copied, app code changes, a repeat add changes files, a user file is replaced, or an existing module moves                                           |
-| FR3, FR4  | Theme record tests                             | add, remove, use; removing the default; using a theme not added; a hand-edited module; two modules; no module with `astryx.theme` | The default is not an added theme, a hand-edited or second module is overwritten, theme state is written outside the module, or `astryx.theme` stops resolving |
-| FR5, FR12 | Response type, text field, and docs tests      | every command; first add; JSON callers                                                                                            | `theme.add` is emitted, a field has no text projection, or a doc still says add copies                                                                         |
-| FR6       | Eject tests against the former copy fixtures   | bundled, integration, and nested-file themes                                                                                      | Ejected bytes or receipt fields differ from the former copy                                                                                                    |
-| FR7, FR8  | Pack check and real provider-to-consumer tests | multi-theme package; single-theme package; missing export; font stylesheet missing from the tarball; stale build                  | A theme without a resolvable built module is added, or pack check passes a stale or missing export                                                             |
-| FR9       | Generated module tests                         | package and local themes                                                                                                          | The module imports source                                                                                                                                      |
-| FR10      | List tests                                     | added, default, bundled, package, local                                                                                           | A listed theme lacks its app fields                                                                                                                            |
-| FR11      | Doctor tests, one planted fault per check      | each of the ten faults; a correct app                                                                                             | A check passes on its fault, or passes without positive evidence                                                                                               |
-| FR13      | Docs and agent-docs tests                      | theme guide, integration guide, agent block, init next steps                                                                      | A surface teaches copying as the way to use a theme                                                                                                            |
+| Contract  | Verification                                   | Representative states                                                                                                                                          | Mutation or failure expectation                                                                                                                                |
+| --------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR1, FR2  | Theme command tests and a real consumer        | first add; repeat add; a slug re-added from another owner; hand-written file at the module home; no TypeScript; no `src` folder; `src` added later             | Source is copied, app code changes, a repeat add changes files, a re-add keeps the old owner, a user file is replaced, or an existing module moves             |
+| FR3, FR4  | Theme record tests                             | add, remove, use; removing the default; using a theme not added; a hand-edited module; two modules; no module with `astryx.theme`                              | The default is not an added theme, a hand-edited or second module is overwritten, theme state is written outside the module, or `astryx.theme` stops resolving |
+| FR5, FR12 | Response type, text field, and docs tests      | every command; first add; JSON callers                                                                                                                         | `theme.add` is emitted, a field has no text projection, or a doc still says add copies                                                                         |
+| FR6       | Eject tests against the former copy fixtures   | bundled, integration, and nested-file themes; eject then list                                                                                                  | Copied source bytes or former receipt fields differ, the descriptor is missing, or the ejected theme is not listed as local                                    |
+| FR7, FR8  | Pack check and real provider-to-consumer tests | multi-theme package; single-theme package; missing export; font stylesheet missing from the tarball; stale build; a local theme sharing a package theme's slug | A theme without a resolvable built module is added, pack check passes a stale or missing export, or a shared slug adds the package theme without `--package`   |
+| FR9       | Generated module tests                         | package and local themes                                                                                                                                       | The module imports source                                                                                                                                      |
+| FR10      | List tests                                     | added, default, bundled, package, local                                                                                                                        | A listed theme lacks its app fields                                                                                                                            |
+| FR11      | Doctor tests, one planted fault per check      | each of the ten faults; a correct app                                                                                                                          | A check passes on its fault, or passes without positive evidence                                                                                               |
+| FR13      | Docs and agent-docs tests                      | theme guide, integration guide, agent block, init next steps                                                                                                   | A surface teaches copying as the way to use a theme                                                                                                            |
 
 ## Decision log
 
@@ -292,8 +298,8 @@ Each stays inside the `theme` command's job, managing an app's themes
 - `theme use` answers "start with this theme". An option on `add` could not set
   the default of a theme that is already added.
 - `theme eject` answers "give me this theme's source to fork". It is the former
-  `theme add` behavior, moved under `spec:AST-042/FR6`; an option on `add` would
-  give `add` two opposite results.
+  `theme add` copy, plus the descriptor a local theme needs, moved under
+  `spec:AST-042/FR6`; an option on `add` would give `add` two opposite results.
 
 Each has one API function under `spec:AST-042/FR1`.
 
