@@ -12,7 +12,9 @@ exactly this case, and the message carried an absolute host path where every
 other Astryx message names its target relative to the project.
 
 Both now throw ERR_WRITE_FAILED with the errno kept (it is the part that says
-what to fix) and the target named relative to the project. Nothing is partially
-written, and nothing else about the commands changes.
+what to fix) and the target named relative to the project. Nothing is left
+half-written: a `swizzle` that fails part-way removes the files it already
+copied and puts back any it replaced before it reports the error, and the
+message names any file it could not restore.
 
 @josephfarina

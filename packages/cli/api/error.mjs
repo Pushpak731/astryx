@@ -49,23 +49,31 @@ export class AstryxError extends Error {
  * keeps the errno, which is the part that tells you what to fix, and reports
  * the target the way every other Astryx message does: relative to the project.
  *
- * Only for a write that failed outright. A write that half-succeeded is a
- * different report, and no caller of this has one.
+ * A caller that wrote files before the failure must undo them first and pass
+ * the ones it could not restore as `unrestored`, so the message never says
+ * nothing was written when something was.
  *
  * @param {string} target absolute path the write was aimed at
  * @param {string} cwd project root, for the relative form
  * @param {unknown} cause the error the filesystem call threw
+ * @param {string[]} [unrestored] absolute paths an undo could not put back
  * @returns {AstryxError}
  */
-export function writeFailed(target, cwd, cause) {
+export function writeFailed(target, cwd, cause, unrestored = []) {
   const rel = path.relative(cwd, target) || target;
   const errno =
     typeof (/** @type {any} */ (cause)?.code) === 'string'
       ? /** @type {any} */ (cause).code
       : null;
   const why = errno === 'EACCES' || errno === 'EPERM' ? ' (no permission)' : '';
+  const outcome =
+    unrestored.length === 0
+      ? 'Nothing was written.'
+      : `Earlier writes could not all be undone: ${unrestored
+          .map(file => path.relative(cwd, file) || file)
+          .join(', ')}.`;
   return new AstryxError(
-    `Could not write ${rel}${errno ? `: ${errno}` : ''}${why}. Nothing was written.`,
+    `Could not write ${rel}${errno ? `: ${errno}` : ''}${why}. ${outcome}`,
     undefined,
     ERROR_CODES.ERR_WRITE_FAILED,
   );
