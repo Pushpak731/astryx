@@ -172,7 +172,7 @@ export const doc = {
     {
       value: 'template.show',
       description:
-        "The resolved template's raw source plus its description, kind, and the component names it composes.",
+        "The resolved template's source, exactly as a copy writes it (Astryx demo media already replaced), plus its description, kind, and the component names it composes.",
     },
     {
       value: 'template.skeleton',
