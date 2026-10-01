@@ -3,12 +3,12 @@ schema_version: 4
 template_version: 1
 kind: system-spec
 id: spec:AST-049
-authority: draft
+authority: current
 archive_reason: null
 superseded_by: null
-approved_by: null
-approved_at: null
-phase: proposed
+approved_by: imdreamrunner
+approved_at: 2026-09-30
+phase: accepted
 owners: [imdreamrunner, rubyycheung]
 affects_architecture:
   [
@@ -90,7 +90,7 @@ Use the effective `lg` breakpoint governed by `spec:AST-012`; the stock value is
 
 Theme token, authoring, compilation, and application contracts, and the
 `typography`/`theme` guides, are affected; ownership remains with their existing records.
-This PR changes only the specification; related implementation is [PR #6699][implementation].
+Related implementation: [PR #6699][implementation].
 
 ## Verification
 
@@ -105,19 +105,19 @@ This PR changes only the specification; related implementation is [PR #6699][imp
 ### DEC-1 — Theme base
 
 **Reference:** `spec:AST-049/DEC-1`
-**Decider:** Pending human approval.
+**Decider:** `imdreamrunner`, `2026-09-30`
 **Decision:** Raise bases below 16px-reference without changing the document root.
 
 ### DEC-2 — Ratio-to-target mapping
 
 **Reference:** `spec:AST-049/DEC-2`
-**Decider:** Pending human approval.
+**Decider:** `imdreamrunner`, `2026-09-30`
 **Decision:** Pin Display 1, Heading 2, or Heading 3 according to the desktop ratio.
 
 ### DEC-3 — Narrow and primary-coarse
 
 **Reference:** `spec:AST-049/DEC-3`
-**Decider:** Pending human approval.
+**Decider:** `imdreamrunner`, `2026-09-30`
 **Decision:** Activate the mobile profile only on narrow, primary-coarse viewports.
 
 ## Open questions
