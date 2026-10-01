@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6505,
+    "headSha": "c610fd8c12f3c51db03aba98fe8ce639f107bd09",
+    "headRef": "fix/menu-collision-fallback",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36563970721,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6505/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": false,
+      "path": "pr/6505/sandbox/",
+      "indexSha256": null
+    }
+  }
+}

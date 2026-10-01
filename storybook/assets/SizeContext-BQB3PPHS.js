@@ -1,0 +1,1 @@
+import{i as e,s as t}from"./preload-helper-CT_b8DTk.js";import{t as n}from"./react-B7Te67-h.js";import{n as r,r as i}from"./layerScopedContext-B4jcFeGf.js";function a(e,t=`md`){let n=(0,o.use)(s);return e??n??t}var o,s,c,l=e((()=>{o=t(n(),1),i(),s=r(null),s.displayName=`SizeContext`,c=s.Provider}));export{l as n,a as r,c as t};

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6743,
+    "headSha": "5274e84ecce14237864d40c36ed2029f078eea16",
+    "headRef": "potatowagon/richtextview-merge-props",
+    "headRepository": "potatowagon/astryx",
+    "headRepositoryId": "1298783441"
+  },
+  "sourceRun": {
+    "id": 36551264861,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6743/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6743/sandbox/",
+      "indexSha256": "98208aa80b20bab8fe1d41036028354dbf77439e044aedbf7ec4df646104f749"
+    }
+  }
+}

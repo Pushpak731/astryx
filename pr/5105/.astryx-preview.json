@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 5105,
+    "headSha": "827a1c68c0a7693531d82ac60cc4ab9eb3966465",
+    "headRef": "feat/4182-dialog-hero-header",
+    "headRepository": "jiunshinn/astryx",
+    "headRepositoryId": "1286933429"
+  },
+  "sourceRun": {
+    "id": 36722001411,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/5105/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/5105/sandbox/",
+      "indexSha256": "a338768219df11cb80aaba7dec4272368ab84810a5cbc81047cecd0a57b59e9e"
+    }
+  }
+}

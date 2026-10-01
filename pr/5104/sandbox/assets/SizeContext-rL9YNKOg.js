@@ -1,0 +1,1 @@
+import{J as e,Z as t}from"./padding.stylex-C-GcuG1E.js";import{n}from"./layerScopedContext-49klK1vA.js";var r=t(e(),1),i=n(null);i.displayName=`SizeContext`;function a(e,t=`md`){let n=(0,r.use)(i);return e??n??t}var o=i.Provider;export{a as n,o as t};

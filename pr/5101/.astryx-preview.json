@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 5101,
+    "headSha": "deaaa1c0f4da12c79f50b64c85522ebc4365eb17",
+    "headRef": "fix/3506-swizzle-recursive-copy",
+    "headRepository": "jiunshinn/astryx",
+    "headRepositoryId": "1286933429"
+  },
+  "sourceRun": {
+    "id": 36721556353,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/5101/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/5101/sandbox/",
+      "indexSha256": "f77aedd52b881a64e7352fb07475695eb78796fcc40ac878c36fd211002f71ee"
+    }
+  }
+}

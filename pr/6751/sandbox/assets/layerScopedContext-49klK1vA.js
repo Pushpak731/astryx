@@ -1,0 +1,1 @@
+import{J as e,Z as t,q as n}from"./padding.stylex-C-GcuG1E.js";var r=t(e(),1),i=n(),a=[];function o(e){let t=(0,r.createContext)(e);return t.displayName=`LayerScopedContext`,a.push(n=>(0,i.jsx)(t,{value:e,children:n})),t}function s({children:e}){let[t]=(0,r.useState)(()=>a.slice());return t.reduceRight((e,t)=>t(e),e)}export{o as n,s as t};

@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6430,
+    "headSha": "4d6e42599021514cbce8bd621dcd338545b1fc34",
+    "headRef": "fix/calendar-week-number-dst-offset",
+    "headRepository": "HelloOjasMutreja/astryx",
+    "headRepositoryId": "1309798825"
+  },
+  "sourceRun": {
+    "id": 36745122743,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6430/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6430/sandbox/",
+      "indexSha256": "8c603619b46d05cc2236c2148846dfbc76025e1ad449fd239f70d2f93219b16c"
+    }
+  }
+}

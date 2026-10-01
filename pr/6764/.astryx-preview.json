@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6764,
+    "headSha": "66026f79eabf760a54f990953cd2067b6009ff46",
+    "headRef": "docs/drawer-text-boundary-spec",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36608292747,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6764/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6764/sandbox/",
+      "indexSha256": "fee674ae883f3dee2cc79719192da2ef4a43b415c704c73e079144a860941133"
+    }
+  }
+}

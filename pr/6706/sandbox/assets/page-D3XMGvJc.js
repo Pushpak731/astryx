@@ -1,0 +1,4 @@
+import{q as e}from"./padding.stylex-C-GcuG1E.js";import{t}from"./Text-Eiu_PAn_.js";import{i as n}from"./presets-DJZRwABe.js";import{Ft as r,N as i,j as a}from"./index-6DRTN0ew.js";import{n as o}from"./BlockDocContext-CT8Uu0cA.js";var s=e(),c=`async function save() {
+  await api.update(values);
+  toast.show('Saved');
+}`;function l(){return(0,s.jsx)(r,{theme:n,children:(0,s.jsxs)(a,{direction:`vertical`,gap:2,style:{width:360,maxWidth:`100%`},children:[(0,s.jsx)(t,{type:`supporting`,weight:`bold`,color:`secondary`,children:`One Dark Pro preset`}),(0,s.jsx)(i,{code:c,language:`tsx`})]})})}function u(){return(0,s.jsx)(o,{children:(0,s.jsx)(l,{})})}export{u as default};

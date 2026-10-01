@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6754,
+    "headSha": "6958c1d4afe13923958ba9b20cf0901411ff6593",
+    "headRef": "nynexman4464/ci/stacked-pr-review-gates",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36618046162,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6754/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": false,
+      "path": "pr/6754/sandbox/",
+      "indexSha256": null
+    }
+  }
+}

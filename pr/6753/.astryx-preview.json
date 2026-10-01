@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6753,
+    "headSha": "3c9faf141d45dbf924d5c80345c5ce052096dcf1",
+    "headRef": "fix/v0.6.4-cli-integrations-alias",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36749355282,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6753/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6753/sandbox/",
+      "indexSha256": "a6250dc7dca7a0f9c9a72608dc2ad032eb1d751a571e079037b8b720cd149b71"
+    }
+  }
+}

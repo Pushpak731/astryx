@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6726,
+    "headSha": "422b6caba6982938c058afe6384b774411f4cb0a",
+    "headRef": "nynexman4464/fix/playground-vercel-cookie-probe",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36499973471,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6726/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": false,
+      "path": "pr/6726/sandbox/",
+      "indexSha256": null
+    }
+  }
+}

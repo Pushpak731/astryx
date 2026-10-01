@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6751,
+    "headSha": "9d7ca88cbd737a2a18299bf59699560f04d0e6e5",
+    "headRef": "chore/layer-changeset-patch",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36607889155,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6751/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6751/sandbox/",
+      "indexSha256": "3089c823a7add72e967cf3a7fcf1636a8d28ea7be9550158b05772b6dda36462"
+    }
+  }
+}

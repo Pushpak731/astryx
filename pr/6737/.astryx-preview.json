@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6737,
+    "headSha": "e6592ab956f4b63214cc726c67921e247c4f9207",
+    "headRef": "docs/cli-integration-guides",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36782449847,
+    "attempt": 1,
+    "conclusion": "failure"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6737/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": false,
+      "path": "pr/6737/sandbox/",
+      "indexSha256": null
+    }
+  }
+}

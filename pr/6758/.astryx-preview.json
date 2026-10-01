@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6758,
+    "headSha": "ce0b30093fc95a1a53804ba227b65168d829dbc6",
+    "headRef": "fix/spinbutton-a11y-contracts",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36604349759,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6758/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6758/sandbox/",
+      "indexSha256": "c7bebcf04f9e7b4b3d915feed3844998557307973bd38894e0f43f0260f4ccf9"
+    }
+  }
+}

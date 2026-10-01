@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6763,
+    "headSha": "17020de613b92a10438e9dbe3d4e95cd6d18cf55",
+    "headRef": "feat/vercel-stable-apps-20260929",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36609888681,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6763/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6763/sandbox/",
+      "indexSha256": "f71afc3f0bc38779d9ff74678e6aa75e65f299dd1d8a3f7e4c8befe9efb78e84"
+    }
+  }
+}

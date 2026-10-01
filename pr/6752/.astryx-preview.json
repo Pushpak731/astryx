@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6752,
+    "headSha": "20287b9fead8112e42e6d564d0150787dcbfe009",
+    "headRef": "fix-markdown-lazy-continuations-kt-xi7y",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36591160921,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6752/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6752/sandbox/",
+      "indexSha256": "68bb5a841f634b2b7e3989015cf65b16e9214976a014cff580dc368f4c85f0d5"
+    }
+  }
+}

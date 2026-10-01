@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6216,
+    "headSha": "c6a983e874ce134e56f860c693133fefd2456812",
+    "headRef": "docs/mcp-setup-instructions",
+    "headRepository": "kyu-rong/astryx",
+    "headRepositoryId": "1352594776"
+  },
+  "sourceRun": {
+    "id": 36523044337,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6216/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6216/sandbox/",
+      "indexSha256": "9b549951ac1720f9351ea91efa4b37372d8bb2c04c5ad1b14d4ed55293f7a36b"
+    }
+  }
+}

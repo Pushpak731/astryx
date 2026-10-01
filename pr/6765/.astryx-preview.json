@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6765,
+    "headSha": "e3ee1ab3085a6e9e67b1c3eefb6026cbc8912a2f",
+    "headRef": "fix/stepper-layer-connector-gap",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36626614209,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6765/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6765/sandbox/",
+      "indexSha256": "6483d11340f0b7e87f6300579fbef97346217f0e41dfc9ed616b8d1e27bdafb3"
+    }
+  }
+}

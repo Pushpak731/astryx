@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6734,
+    "headSha": "13d19399786be1ca694e1de104f60c8097805420",
+    "headRef": "fix/chat-composer-input-inline-padding",
+    "headRepository": "korkt-kim/astryx",
+    "headRepositoryId": "1365934912"
+  },
+  "sourceRun": {
+    "id": 36522785335,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6734/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6734/sandbox/",
+      "indexSha256": "e2598bc682fc9e4e5a6e6e73edce0462b4be80d1ba4baf1423d8647255e788c2"
+    }
+  }
+}

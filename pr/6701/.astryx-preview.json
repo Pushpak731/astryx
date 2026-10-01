@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6701,
+    "headSha": "98010f889e27c27b77e8daa1eef2cefe0abd2851",
+    "headRef": "dependabot/npm_and_yarn/production-dependencies-cd8d073787",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36522862492,
+    "attempt": 1,
+    "conclusion": "failure"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6701/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": false,
+      "path": "pr/6701/sandbox/",
+      "indexSha256": null
+    }
+  }
+}

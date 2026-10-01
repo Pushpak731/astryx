@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6800,
+    "headSha": "96abf2cc64eb0b02bbae8ad7d80528e6c29571a5",
+    "headRef": "fix/lab-docsite-plumbing-master",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36787495425,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6800/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": false,
+      "path": "pr/6800/sandbox/",
+      "indexSha256": null
+    }
+  }
+}

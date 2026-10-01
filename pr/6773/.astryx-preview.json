@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6773,
+    "headSha": "fe21b49d41d6627f8c299c95cb32ec7044d19bc7",
+    "headRef": "fix/use-hotkeys-ime",
+    "headRepository": "korkt-kim/astryx",
+    "headRepositoryId": "1365934912"
+  },
+  "sourceRun": {
+    "id": 36662050589,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6773/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": false,
+      "path": "pr/6773/sandbox/",
+      "indexSha256": null
+    }
+  }
+}

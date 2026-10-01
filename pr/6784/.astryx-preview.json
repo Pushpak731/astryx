@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "repository": "facebook/astryx",
+  "pullRequest": {
+    "number": 6784,
+    "headSha": "96c769edb4028565c7d1ff4a3d0d83bc4a1e232e",
+    "headRef": "fix/cli-floor-test-release-coupling",
+    "headRepository": "facebook/astryx",
+    "headRepositoryId": "1131202426"
+  },
+  "sourceRun": {
+    "id": 36740613765,
+    "attempt": 1,
+    "conclusion": "success"
+  },
+  "targets": {
+    "storybook": {
+      "available": false,
+      "path": "pr/6784/",
+      "indexSha256": null
+    },
+    "sandbox": {
+      "available": true,
+      "path": "pr/6784/sandbox/",
+      "indexSha256": "3a8f4edcae649b3d7dba7c6262d32f58d2120d1369e47b52eb35336e39f6865a"
+    }
+  }
+}
