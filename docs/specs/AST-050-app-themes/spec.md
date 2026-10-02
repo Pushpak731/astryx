@@ -128,10 +128,10 @@ integration items are described.
   `@font-face` rules or import them from a font service. `theme add`
   MUST fail, naming what is missing, when a theme has no resolvable built module
   and stylesheet; it never falls back to copying or to runtime source.
-  `integration add theme` MUST write these exports, and
-  `integration pack --check` MUST fail when an exported theme module,
-  stylesheet, or font stylesheet does not resolve from the packed tarball, or
-  when a built module or stylesheet does not match its source.
+  `integration add theme` MUST write these exports, and `integration verify`
+  MUST fail when an exported theme module, stylesheet, or font stylesheet does
+  not resolve from the packed tarball, or when a built module or stylesheet
+  does not match its source.
 - **FR8 — Local themes are added like package themes.** The project's local
   themes root is `src/themes`: the folder `theme add` copied into before this
   record and the folder `theme eject` copies into by default, also in a project
@@ -228,7 +228,7 @@ When this ships:
 - `architecture:cli-surface` INV19 changes from "integration themes are packaged
   editable source" to "integration themes are importable packages, and editable
   source is an explicit eject";
-- `integration add theme` writes theme exports, and `integration pack --check`
+- `integration add theme` writes theme exports, and `integration verify`
   checks them;
 - doctor's theme check is replaced by FR11, or by the FR12 report in a project
   with no theme module;
