@@ -89,13 +89,13 @@ A continuous library may declare a numeric range instead:
 
 ```tsx
 const capabilities = defineIconCapabilities({
-  weights: {range: {min: 100, max: 700}},
+  weights: {range: {min: 100, max: 700, default: 400}},
 });
 ```
 
 The final exported names require normal API review, but the public structure is
 one grouped contract rather than unrelated declarations. Generated types, docs,
-inspection, runtime themes, and built themes all derive from that same contract.
+runtime themes, and built themes all derive from that same contract.
 
 All installed contracts compose into one application capability set. A custom size
 name has one canonical default dimension in that set. Repeating the same name with
@@ -126,16 +126,17 @@ defineTheme({
 
 - An **icon version** is either a fixed React node or a pure parameterized icon
   component supplied by an integration.
-- A **parameterized version** receives a validated numeric weight and maps it to
+- A **parameterized version** receives either a validated requested numeric weight
+  or its range's declared default when weight is omitted, then maps that number to
   its own library API, such as a variable-font axis or `strokeWidth`. Astryx passes
   the admitted value but does not interpret or mutate it.
 - An **icon entry** is either one fixed version or an adaptive tree of supplied
   branches. Every branch has a default that is always present. A default may be
   another adaptive branch for later axes, and every path ends at an icon version.
 
-Adaptive entries may supply branches by size, appearance, weight, or a
-combination. They are not required to support every value admitted by the
-capability contract. Conceptually:
+Adaptive entries may nest branches by size, appearance, and weight in the order
+that matches the supplied library. They are not required to support every value
+admitted by the capability contract. Conceptually:
 
 ```tsx
 const outline = {
@@ -155,9 +156,14 @@ const search = {
 };
 ```
 
+A sparse library may put size branches inside an appearance branch instead. For
+example, a Heroicons-style `solid` branch may contain exact 16px, 20px, and 24px
+versions while its `outline` branch has only a 24px default. The resolver supports
+both this shape and appearance branches nested inside size branches.
+
 A continuous library instead supplies a pure parameterized component for its
-admitted range. The component—not Astryx—maps the validated number to that
-library's rendering API.
+admitted range. The component—not Astryx—maps the validated requested value or the
+range's declared default to that library's rendering API.
 
 ## Size
 
@@ -205,13 +211,21 @@ A capability contract may declare either:
 
 - exact numeric or named values, such as `400 | 500 | 600` or
   `"regular" | "bold"`; or
-- a continuous numeric range with a minimum and maximum.
+- a continuous numeric range with a minimum, maximum, and default value inside the
+  range.
 
-Exact values provide literal types and autocomplete. A range accepts numbers and
-validates its bounds at runtime. An in-range value is passed unchanged to the
-integration's supplied parameterized version. Different installed themes may
-declare different sets; public callsite types describe their combined admitted
-values because the active theme can change at runtime.
+Exact values provide literal types and autocomplete. A range accepts numbers,
+validates its bounds at runtime, and declares the in-range number used when `weight`
+is omitted. A requested in-range value is passed unchanged to the integration's
+supplied parameterized version. Different installed themes may declare different
+sets; public callsite types describe their combined admitted values because the
+active theme can change at runtime.
+
+When every installed contract uses exact values, `weight` retains their literal
+union. Installing any range necessarily widens the application's `weight` type to
+`number`, so TypeScript cannot reject every out-of-range literal or preserve a
+literal-only completion list in that application. Runtime range validation and
+contract-aware documentation remain authoritative.
 
 If the current branch does not provide an exact weight or parameterized range, or
 a number is outside its declared range, Astryx uses that branch's supplied default
@@ -250,9 +264,9 @@ Each optional request resolves in this order:
 
 A component-owned default is evaluated like an explicit request during icon
 selection. If the current branch cannot satisfy it, resolution enters that branch's
-supplied default and continues to any later axis. Inspection records the requested
-and selected values, but runtime warnings are reserved for explicit caller requests
-so existing fixed themes do not warn on every component-owned icon.
+supplied default and continues to any later axis. Runtime warnings are reserved for
+explicit caller requests so existing fixed themes do not warn on every
+component-owned icon.
 
 Components do not automatically gain public icon appearance or weight props.
 Each component or family must deliberately expose caller control when that choice
@@ -260,41 +274,56 @@ is caller-owned and cannot be derived from component behavior.
 
 ## Resolution order
 
-For a semantic icon name, Astryx resolves:
+For a semantic icon name, Astryx first resolves:
 
 1. one icon entry from the active theme, then a process-wide fixed registration,
-   then the built-in fixed default;
+   then the built-in fixed default; and
 2. the box size from an explicit request, component/family policy, or standalone
    `md`, using the nearest active theme override when present and otherwise the
-   application's canonical default dimension for that size name;
-3. an exact size-specific branch when one exists, otherwise the root branch;
-4. an exact appearance branch when one exists, otherwise the current branch's
-   supplied default branch; and
-5. an exact weight version or supplied parameterized range when one exists,
-   otherwise the current branch's supplied default version.
+   application's canonical default dimension for that size name.
 
-Each axis is evaluated once. For example, if `duotone` is unavailable but the
-default appearance branch supplies weight `600`, a request for
-`appearance="duotone" weight={600}` reports only the appearance mismatch and still
-selects weight `600` inside the default appearance branch. If an exact size or
-appearance branch ends in one fixed version, a later unsupported request keeps
-that version and reports the later mismatch; resolution does not return to a
-broader branch.
+Astryx then traverses the selected adaptive entry:
 
-After an exact adaptive size or appearance match, later fallback stays inside
-that match. It does not return to root branches or another registry source.
+1. Size, appearance, and weight begin unresolved.
+2. At the current branch, Astryx looks for exact children for unresolved axes. When
+   more than one exact child is available at that branch, priority is size, then
+   appearance, then weight.
+3. After an exact child is selected, that axis is resolved and is not evaluated
+   again. Astryx descends and retries the still-unresolved axes, so a size branch may
+   live inside an appearance branch or an appearance branch inside a size branch.
+4. When the current branch has no exact child for any unresolved request, Astryx
+   descends into its supplied default and retries there.
+5. At a fixed leaf, an unresolved appearance or weight is unsupported. An unresolved
+   size means no size-specific artwork exists, so the leaf renders in the resolved
+   box without a warning. A validated requested numeric range counts as an exact
+   weight match and renders through its supplied parameterized component. When
+   weight is omitted, that component receives the range's declared default.
+
+For example, if `duotone` is unavailable but the default appearance branch supplies
+weight `600`, a request for `appearance="duotone" weight={600}` reports only the
+appearance mismatch and still selects weight `600`. If an exact appearance branch
+ends in one fixed version, a later unsupported weight keeps that version and reports
+the weight mismatch; resolution does not return to a broader branch.
+
+After an exact match, later fallback stays inside that match. It does not return to
+root branches or another registry source.
 
 After one registry source supplies an entry, Astryx does not fill missing versions
 from another source. A child theme that replaces an icon entry replaces it as a
 unit; nested version maps do not merge implicitly across theme or registry
 boundaries. This prevents one rendered icon from mixing icon families.
 
-## Component slots and programmatic lookups
+## Existing component icon paths and programmatic lookups
 
-Component-owned icon slots use the same resolver. A semantic slot receives the
-component/family policy before version selection. A slot containing a fixed React
-node follows the fixed-source behavior. Existing behavior for a missing or
-unresolved namespaced icon key does not change.
+Existing component-owned icon rendering and `renderIconSlot` use the same entry
+resolver whenever they resolve a semantic icon name. A directly supplied React node
+follows the fixed-source behavior. Existing behavior for a missing or unresolved
+namespaced icon key does not change.
+
+AST-054 does not create or expand a separate theme-level `componentIcons` registry.
+That documented but unimplemented subsystem remains owned by
+`architecture:icon-resolution-and-component-slots` and requires its own authority
+and implementation before it can become a dependency of this feature.
 
 Existing one-argument programmatic calls remain valid and return the same React
 nodes as today. Request-aware forms accept optional size, appearance, and weight
@@ -306,25 +335,26 @@ review, but the compatibility rule does not: existing calls require no migration
 Capability mismatch alone never throws during rendering. This matrix is the
 normative fallback and diagnostic behavior:
 
-| Situation                                                                               | Rendered result                                                       | Development reporting                                     |
-| --------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------- |
-| Request omitted                                                                         | documented default                                                    | none                                                      |
-| Explicit appearance or weight is admitted but unsupported by the current branch         | that branch's supplied default, followed by any later resolvable axis | one deduplicated console warning plus inspection metadata |
-| Component/family policy value is unsupported                                            | that branch's supplied default                                        | inspection metadata only                                  |
-| Explicit appearance or weight targets a fixed source                                    | the fixed version                                                     | one deduplicated console warning plus inspection metadata |
-| Exact size-specific artwork is absent                                                   | root branch in the resolved box                                       | none                                                      |
-| Untyped runtime request is outside the application capability contract or numeric range | the same fallback as an unsupported request                           | one deduplicated console warning plus inspection metadata |
-| Runtime data bypasses authoring validation and contains a malformed icon entry          | skip that registry source and continue normal source precedence       | one deduplicated console warning plus inspection metadata |
+| Situation                                                                               | Rendered result                                                                                                  | Development reporting            |
+| --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| Request omitted                                                                         | documented default                                                                                               | none                             |
+| Explicit appearance or weight is admitted but unsupported by the current branch         | best exact sibling match under traversal, otherwise that branch's supplied default; later axes remain resolvable | one deduplicated console warning |
+| Component/family policy value is unsupported                                            | that branch's supplied default                                                                                   | none                             |
+| Explicit appearance or weight targets a fixed source                                    | the fixed version                                                                                                | one deduplicated console warning |
+| Exact size-specific artwork is absent                                                   | root/default leaf in the resolved box                                                                            | none                             |
+| Untyped runtime request is outside the application capability contract or numeric range | the same fallback as an unsupported request                                                                      | one deduplicated console warning |
+| Runtime data bypasses authoring validation and contains a malformed icon entry          | skip that registry source and continue normal source precedence                                                  | one deduplicated console warning |
 
-Production emits no capability-mismatch console warning. Inspection still reports
-requested, admitted, supported, and selected values when inspection is enabled.
+Production emits no capability-mismatch console warning.
 
-A statically known exact value outside the application contract is a TypeScript
-error. Untyped callers use the runtime behavior above. Malformed capability
-contracts, conflicting custom-size defaults, missing branch defaults, invalid
-ranges, and malformed theme overrides fail capability, theme-authoring, or
-static-build validation before the theme is used. Runtime and built themes apply
-the same validation contract and preserve the same resolved capability metadata.
+When every installed contract uses exact values, a statically known exact value
+outside the application contract is a TypeScript error. An installed numeric range
+widens the application type to `number`, so range bounds are enforced at runtime.
+Untyped callers use the runtime behavior above. Malformed capability contracts,
+conflicting custom-size defaults, missing branch defaults, invalid ranges, and
+malformed theme overrides fail capability, theme-authoring, or static-build
+validation before the theme is used. Runtime and built themes apply the same
+validation contract and preserve the same resolved capability metadata.
 
 ## What Astryx never generates
 
@@ -339,6 +369,7 @@ transforms, filters, or geometry to imitate a missing appearance or weight.
 - Require every icon to support every value admitted by its capability contract.
 - Clamp, interpolate, synthesize, or mutate icon versions.
 - Add icon appearance or weight props to every Astryx component automatically.
+- Create a new component-icon registry or public inspection API.
 - Change semantic icon names, color, direction, accessibility, interaction,
   registry-source precedence, or existing missing-key behavior.
 - Equivalent internal implementations remain valid when they satisfy this
@@ -351,33 +382,38 @@ transforms, filters, or geometry to imitate a missing appearance or weight.
   its default branch and still honor a later weight request. Omitting any request is
   valid.
 - **FR2 — One grouped application capability set owns admitted values.** Types,
-  docs, inspection, runtime themes, and built themes derive from the same reusable
-  contracts. Duplicate custom-size names must have identical defaults; conflicting
-  defaults fail validation.
+  docs, runtime themes, and built themes derive from the same reusable contracts.
+  Duplicate custom-size names must have identical defaults; conflicting defaults
+  fail validation.
 - **FR3 — Every size has a safe canonical dimension.** Astryx's four existing names
   keep their current defaults. Every added name declares one application-wide
   default that remains available under any active theme. The nearest theme may
   override dimensions but may not remove admitted names.
 - **FR4 — Weight supports discrete and continuous libraries.** A contract declares
-  exact numeric or named values, or one numeric range. An in-range number is passed
-  unchanged to an integration-supplied pure parameterized component. Astryx defines
-  no universal weight scale or library-specific mapping.
+  exact numeric or named values, or one numeric range with an in-range default. A
+  requested in-range number or the omitted-request default is passed unchanged to
+  an integration-supplied pure parameterized component. Any installed range widens
+  the application weight type to `number`; exact-only applications keep literal
+  unions. Astryx defines no universal scale or library-specific mapping.
 - **FR5 — Every adaptive branch has a supplied default.** Fixed entries remain
-  valid. An adaptive default may itself contain later-axis branches, and every path
-  ends at a supplied fixed or parameterized icon version.
+  valid. Branches may nest axes in either order. An adaptive default may itself
+  contain later unresolved axes, and every path ends at a supplied fixed version or
+  a parameterized version whose range declares an omitted-weight default.
 - **FR6 — Capability mismatch does not throw during rendering.** Fallback and
   reporting follow the normative matrix above. Development console warnings are
-  limited to explicit caller or untyped runtime requests; policy fallback remains
-  available through inspection without warning on every fixed icon.
+  limited to explicit caller or untyped runtime requests; policy fallback is silent
+  so fixed themes do not warn on every icon.
 - **FR7 — Families do not repeat shared defaults.** One component/family policy may
   provide fixed defaults or derive them from component inputs for every owned icon
   role. Explicit caller intent wins; documented exceptions may override the policy.
-- **FR8 — Size artwork degrades to the root branch.** An exact branch keyed by the
-  requested size name is used when present. Its absence renders the root branch in
-  the resolved box without a warning.
-- **FR9 — Resolution narrows in one direction.** Source, size, appearance, and
-  weight resolve in that order. After an exact adaptive match, later fallback stays
-  inside that match.
+- **FR8 — Missing size artwork uses the current default.** An exact branch keyed by
+  the requested size name is used wherever it appears in the adaptive tree. If no
+  exact size branch is found before a leaf, that leaf renders in the resolved box
+  without a warning.
+- **FR9 — Resolution narrows without requiring one nesting order.** Source selection
+  happens first. Within one entry, exact matches consume each axis at most once;
+  size, appearance, then weight break ties at one branch. Still-unresolved axes may
+  match deeper branches, and fallback never returns above an exact match.
 - **FR10 — Sources and theme entries stay isolated.** Resolution does not combine
   versions from multiple registry sources or implicitly merge replacement entries
   across theme inheritance.
@@ -385,10 +421,10 @@ transforms, filters, or geometry to imitate a missing appearance or weight.
   nodes, fixed registrations, and fixed namespaced extensions keep rendering and
   ignore appearance and weight without SVG mutation. Only explicit unsupported
   requests produce the development warning.
-- **FR12 — Slots and programmatic APIs share resolution.** A component slot selects
-  `IconName | null` before entry resolution. Existing one-argument lookups keep
-  their behavior; request-aware forms use the same result as `Icon` for the same
-  request and active theme.
+- **FR12 — Existing icon paths share resolution.** Existing one-argument lookups keep
+  their behavior. Request-aware forms, `renderIconSlot`, and component-owned
+  semantic icon rendering use the same result as `Icon` for the same request and
+  active theme. This spec does not create a separate `componentIcons` registry.
 - **FR13 — Validation happens before theme use.** Capability authoring,
   `defineTheme`, runtime compilation, and static theme builds reject malformed
   branches, ranges, overrides, and conflicting size defaults consistently and
@@ -428,9 +464,12 @@ for an existing size also deliberately choose the resulting layout change.
   and variable-axis models.
 - The draft in
   [PR #6244](https://github.com/facebook/astryx/pull/6244) proposes size-aware
-  registry entries with a required default and closed `bySize` map. AST-054 covers
-  that use case and adds custom size contracts, appearance, weight, parameterized
-  integrations, family policies, and their combined resolver.
+  registry entries with a required default and closed `bySize` map. Its proposed
+  `spec:AST-034` identifier already belongs to the current Theme family build
+  behavior spec, so that draft cannot become authority under its present id.
+  AST-054 incorporates its size-specific use case and is the proposed canonical
+  owner of the broader size, appearance, weight, family-policy, and resolver
+  contract.
 - [PR #6025](https://github.com/facebook/astryx/pull/6025) and
   [PR #6028](https://github.com/facebook/astryx/pull/6028) were earlier closed
   attempts to specify and implement theme-owned Icon sizes.
@@ -440,17 +479,24 @@ for an existing size also deliberately choose the resulting layout change.
   theme-build registry bug that any implementation carrying richer entries must not
   preserve.
 
-Before AST-054 or the size-aware registry draft becomes current, their owners must
-choose one canonical owner for size-specific entry resolution. AST-054 may absorb
-that behavior or depend on an accepted narrower record; the two drafts must not
-become competing authority.
+AST-054 is the proposed canonical owner for size-specific entry resolution. The
+size-aware draft may inform review, but it must use another record id or defer to
+AST-054; the two drafts must not become competing authority.
 
-`architecture:component-theming-surface` INV14 currently keeps `Icon.size`
-closed because an added name has no theme-independent baseline. Acceptance of
-this spec amends that rule for `Icon.size`: an extension is admitted only through
-a public icon capability contract that supplies a default dimension. The active
-theme may override that dimension; without an override, the contract default is
-the no-match baseline. While this spec remains draft, INV14 still governs.
+`architecture:component-theming-surface` INV14 currently requires every
+theme-extensible prop axis to have a safe baseline independent of the active theme.
+Acceptance of this spec amends that rule for all three Icon axes:
+
+- A `size` extension is admitted only through a public icon capability contract that
+  supplies a canonical theme-independent dimension. The active theme may override
+  it; without an override, the contract default is the no-match baseline.
+- `appearance` and `weight` are non-layout visual-selection axes. After one registry
+  source is selected, its always-present default branch is their deterministic
+  baseline even though that branch belongs to the active theme. This exception is
+  safe only because FR14 prohibits appearance or weight fallback from changing box
+  geometry, composition, accessibility, or interaction.
+
+While this spec remains draft, the current INV14 still governs.
 
 Implementation also requires coordinated amendments to the affected current
 records:
@@ -460,12 +506,13 @@ records:
 - theme application makes the nearest active theme's dimension override available
   while preserving the contract baseline;
 - icon resolution covers direct components, fixed and adaptive registry entries,
-  namespaced extensions, component slots, and request-aware programmatic lookups;
+  namespaced extensions, existing component-owned icon paths, and request-aware
+  programmatic lookups;
 - the public API record admits the optional caller-owned `appearance` and `weight`
   requests and reviews exported names and widened public types;
 - the API-conventions record replaces its closed `Icon.size` example with the
-  capability-contract rule: an added name is admissible only when it carries the
-  safe theme-independent default required here;
+  capability-contract rule for size and the selected-entry-default exception for
+  non-layout appearance and weight axes;
 - the current `component:Icon` contract changes its closed size concept, size
   resolution, and caller-owned public requests;
 - the Button-family contract preserves explicit intent and one family-owned policy
@@ -478,14 +525,14 @@ specification pull request changes no runtime or package and adds no Changeset.
 
 ## Verification
 
-| Contract   | Verification                                         | Representative states                                                                                                                | Mutation or failure expectation                                                                      |
-| ---------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| FR1–FR4    | Public type and capability-contract tests            | omitted props; duplicate/conflicting size defaults; active theme using another contract; exact weights; supplied numeric adapter     | arbitrary values type-check, axes stop early, a range lacks a renderer, or size is undefined         |
-| FR5–FR10   | Resolver and theme-inheritance matrix tests          | sparse axes; missing appearance then supported weight; fixed exact match then later request; missing size branch; source replacement | a default is absent, a later axis is skipped, fallback crosses a selected boundary, or entries merge |
-| FR6, FR11  | Development/production diagnostic tests              | explicit versus policy mismatch; direct component; fixed registration; out-of-range weight; malformed runtime entry                  | rendering throws, policy use spams warnings, production warns, or malformed data reaches React       |
-| FR7, FR12  | Family, slot, hook, and programmatic tests           | slot-to-name ordering; explicit request; derived Button mapping; shared default; old and request-aware lookup                        | roles repeat policy, slot meaning changes, explicit intent loses, or public paths disagree           |
-| FR13, FR15 | Theme authoring/build and server/client parity tests | conflicting contract; malformed branch; runtime theme; built theme; nested theme; hydration; pure parameterized component            | invalid input reaches rendering or equivalent inputs select different versions                       |
-| FR14       | Browser presentation and accessibility evidence      | theme size override; fallback version; selected/pressed/loading component states; direction and focus                                | unintended geometry, naming, color, interaction, or style precedence changes                         |
+| Contract   | Verification                                             | Representative states                                                                                                                           | Mutation or failure expectation                                                                            |
+| ---------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| FR1–FR4    | Public type and capability-contract tests                | omitted props; duplicate/conflicting size defaults; active theme using another contract; exact-only versus range-widened weight types           | arbitrary values type-check in exact-only apps, a range lacks a renderer, or size is undefined             |
+| FR5–FR10   | Resolver and theme-inheritance matrix tests              | size→appearance and appearance→size nesting; missing appearance then supported weight; fixed exact match then later request; source replacement | a default is absent, an unresolved axis is skipped, fallback crosses a selected boundary, or entries merge |
+| FR6, FR11  | Development/production diagnostic tests                  | explicit versus policy mismatch; direct component; fixed registration; out-of-range weight; malformed runtime entry                             | rendering throws, policy use spams warnings, production warns, or malformed data reaches React             |
+| FR7, FR12  | Family, existing icon-path, hook, and programmatic tests | `renderIconSlot`; explicit request; derived Button mapping; shared default; old and request-aware lookup                                        | roles repeat policy, explicit intent loses, or public paths disagree                                       |
+| FR13, FR15 | Theme authoring/build and server/client parity tests     | conflicting contract; malformed branch; runtime theme; built theme; nested theme; hydration; pure parameterized component                       | invalid input reaches rendering or equivalent inputs select different versions                             |
+| FR14       | Browser presentation and accessibility evidence          | theme size override; fallback version; selected/pressed/loading component states; direction and focus                                           | unintended geometry, naming, color, interaction, or style precedence changes                               |
 
 ## Decision log
 
@@ -496,9 +543,11 @@ specification pull request changes no runtime or package and adds no Changeset.
 
 Reusable contracts compose into one application capability set containing added
 size names and canonical defaults, appearance names, and either exact weight values
-or numeric ranges backed by integration-supplied parameterized components. Public
-types, docs, runtime, build, and inspection derive from it. Conflicting defaults
-for one custom size name fail validation.
+or numeric ranges with in-range defaults backed by integration-supplied
+parameterized components. Public
+types, docs, runtime, and build derive from it. Conflicting defaults for one custom
+size name fail validation. Installing any numeric range necessarily widens the
+application weight type to `number`; exact-only applications keep literal unions.
 
 Rejected: unrelated declarations that can disagree, ambiguous custom-size defaults,
 one universal appearance list, and one universal weight scale.
@@ -523,10 +572,9 @@ undefined result after theme switching, and fallback to an unrelated size name.
 
 An unsupported appearance enters the current branch's supplied default and later
 axes continue resolving there. Unsupported weight uses that branch's supplied
-default version. Explicit mismatches produce a deduplicated development warning
-and inspection metadata; production silently renders the fallback. Policy defaults
-use inspection without per-render warnings. A missing size-specific branch uses
-the root branch in the resolved box.
+default version. Explicit mismatches produce a deduplicated development warning;
+production silently renders the fallback. Policy defaults fall back silently. A
+missing size-specific branch uses the current leaf in the resolved box.
 
 Rejected: render-time exceptions, clamping, inferred weights, SVG mutation, and
 warnings for normal size-artwork fallback.
@@ -548,11 +596,12 @@ existing Button size mapping as one fixed value.
 **Reference:** `spec:AST-054/DEC-5`
 **Decider:** `rubyycheung`, `2026-10-02`
 
-Resolution moves from one selected source to size, appearance, and weight. Each
-axis is evaluated once. Exact adaptive matches own the choices and default that
-follow, while a missing appearance may enter a default branch that still resolves
-the requested weight. Existing programmatic calls remain compatible while
-request-aware paths share this resolver.
+Resolution selects one source, then one box dimension, then traverses that source's
+adaptive branches. At one branch, size, appearance, then weight break ties; after
+one exact match, still-unresolved axes may match deeper branches in either nesting
+order. A matched axis is never re-evaluated, and fallback never returns above an
+exact match. Existing programmatic calls remain compatible while request-aware
+paths share this resolver.
 
 Rejected: mixing icon families, returning to root after an exact adaptive match,
 and changing existing one-argument lookups.
@@ -570,6 +619,20 @@ it as CSS.
 Rejected: `variant`, `style`, `iconStyle`, and `fill`, which are ambiguous or too
 narrow for the supported library models.
 
+### DEC-7 — Non-layout axes use the selected entry's default
+
+**Reference:** `spec:AST-054/DEC-7`
+**Decider:** `rubyycheung`, `2026-10-02`
+
+An Icon size extension always has a theme-independent canonical dimension because
+size affects layout. Appearance and weight cannot affect geometry, composition,
+accessibility, or interaction, so their safe baseline is the always-present default
+branch of the already-selected icon entry. This is the explicit Icon exception to
+the current theme-independent-baseline rule for non-layout visual axes.
+
+Rejected: requiring one global appearance or weight default across unrelated icon
+libraries and allowing appearance or weight fallback to change layout.
+
 ## Open questions
 
 - **OQ1 — What are the final exported helper, theme-field, and request-aware
@@ -577,7 +640,3 @@ narrow for the supported library models.
   names and their behavior are settled. API review may adjust only the helper,
   grouped theme-field, and programmatic lookup spellings without changing the
   contract decided here.
-- **OQ2 — Which draft becomes the canonical owner of size-specific entry
-  resolution?** (`human-api`) AST-054 and the size-aware registry draft in
-  [PR #6244](https://github.com/facebook/astryx/pull/6244) must be reconciled before
-  either becomes current.
