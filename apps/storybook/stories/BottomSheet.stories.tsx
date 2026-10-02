@@ -81,7 +81,6 @@ export const TextOnly: Story = {
     const [isOpen, setIsOpen] = useState(true);
     return (
       <BottomSheet
-        padding={0}
         {...standaloneArgs}
         isOpen={isOpen}
         onOpenChange={setIsOpen}
@@ -122,15 +121,17 @@ export const TextOnlyFitting: Story = {
 };
 
 /**
- * Content placed directly in the sheet. The sheet pads it like Dialog, and a
- * full-bleed Divider reaches the sheet's edges because the content box
- * publishes its inset.
+ * Content placed directly in a sheet with `padding`. The sheet pads it like
+ * Dialog, and a full-bleed Divider reaches the sheet's edges because the
+ * content box publishes its inset. Without `padding` (or a theme's
+ * bottom-sheet padding) the content box stays unpadded.
  */
 export const ContainerPadding: Story = {
   args: {
     isOpen: true,
     label: 'Order summary',
     height: 'hug',
+    padding: 4,
     children: (
       <VStack gap={4}>
         <Heading level={2}>Order summary</Heading>

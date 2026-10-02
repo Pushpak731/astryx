@@ -2084,8 +2084,7 @@ function FilterOverflow({
           isOpen={isOpen}
           onOpenChange={setIsOpen}
           label={label}
-          height="hug"
-          padding={0}>
+          height="hug">
           {body}
         </BottomSheet>
       </>
@@ -4088,10 +4087,7 @@ export default function TableFilterTemplate() {
       isOpen={isCompactSurface && isViewOpen}
       onOpenChange={setIsViewOpen}
       label="View options"
-      height="tall"
-      // The tab strip compensates against a container inset, so the sheet
-      // publishes none and the wrapper below owns the top band.
-      padding={0}>
+      height="tall">
       {/* The inset is the wrapper's, so the strip's own box starts at the tab
           row and its scroll arrow lands on the tabs rather than above them. */}
       <VStack gap={0} paddingBlockStart={SHEET_TOP_INSET}>

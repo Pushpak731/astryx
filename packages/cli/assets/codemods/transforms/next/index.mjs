@@ -7,14 +7,4 @@
  * this file into the resolved version folder.
  */
 
-import preserveBottomSheetContentPadding, {
-  meta as preserveBottomSheetContentPaddingMeta,
-} from './preserve-bottom-sheet-content-padding.mjs';
-
-export default [
-  {
-    name: 'preserve-bottom-sheet-content-padding',
-    transform: preserveBottomSheetContentPadding,
-    meta: preserveBottomSheetContentPaddingMeta,
-  },
-];
+export default [];

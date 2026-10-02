@@ -18,7 +18,9 @@
  *   --astryx-card-padding-block-end
  *
  * Read order per level: `var(--astryx-…, <next level>)`, terminating at
- * `--spacing-4`. Same pattern for section, dialog, and bottom-sheet.
+ * `--spacing-4`. Same pattern for section and dialog. Bottom-sheet keeps its
+ * released unpadded default: its edges terminate at 0px and its Layout insets
+ * at no value, so an unthemed sheet changes nothing for descendants.
  *
  * ```ts
  * components: {
@@ -131,11 +133,19 @@ const dialogInlineEnd = `var(--astryx-dialog-padding-inline-end, ${dialogInline}
 const dialogBlockStart = `var(--astryx-dialog-padding-block-start, ${dialogShorthand})`;
 const dialogBlockEnd = `var(--astryx-dialog-padding-block-end, ${dialogShorthand})`;
 
-// Bottom sheet padding chains: --astryx-* then the next specificity level,
-// terminating at --spacing-4. Built as chained const strings (no function
-// calls) so StyleX can statically analyze them; see naming.ts for the prefix
-// policy.
-const bottomSheetShorthand = `var(--astryx-bottom-sheet-padding, ${SP4})`;
+// Bottom sheet padding chains: --astryx-* then the next specificity level.
+// Unlike card/section/dialog, the sheet's released default is no padding, so
+// the edge chains terminate at 0px. The Layout inset chains have NO terminal
+// value: with no theme padding they are invalid at computed-value time, which
+// leaves the overlay reset in force and lets a Layout inside the sheet fall
+// back to its own default, exactly as before the sheet was a container. Built
+// as chained const strings (no function calls) so StyleX can statically
+// analyze them; see naming.ts for the prefix policy.
+const bottomSheetThemeShorthand = 'var(--astryx-bottom-sheet-padding)';
+const bottomSheetThemeInline = `var(--astryx-bottom-sheet-padding-inline, ${bottomSheetThemeShorthand})`;
+const bottomSheetThemeInlineStart = `var(--astryx-bottom-sheet-padding-inline-start, ${bottomSheetThemeInline})`;
+const bottomSheetThemeBlockStart = `var(--astryx-bottom-sheet-padding-block-start, ${bottomSheetThemeShorthand})`;
+const bottomSheetShorthand = 'var(--astryx-bottom-sheet-padding, 0px)';
 const bottomSheetInline = `var(--astryx-bottom-sheet-padding-inline, ${bottomSheetShorthand})`;
 const bottomSheetInlineStart = `var(--astryx-bottom-sheet-padding-inline-start, ${bottomSheetInline})`;
 const bottomSheetInlineEnd = `var(--astryx-bottom-sheet-padding-inline-end, ${bottomSheetInline})`;
@@ -237,16 +247,16 @@ const bottomSheetDefaultPaddingStyles = stylex.create({
     '--container-padding-block-end': bottomSheetBlockEnd,
   },
   layoutPaddingOuterX: {
-    '--layout-padding-outer-x': bottomSheetInlineStart,
+    '--layout-padding-outer-x': bottomSheetThemeInlineStart,
   },
   layoutPaddingOuterY: {
-    '--layout-padding-outer-y': bottomSheetBlockStart,
+    '--layout-padding-outer-y': bottomSheetThemeBlockStart,
   },
   layoutPaddingInnerX: {
-    '--layout-padding-inner-x': bottomSheetInlineStart,
+    '--layout-padding-inner-x': bottomSheetThemeInlineStart,
   },
   layoutPaddingInnerY: {
-    '--layout-padding-inner-y': bottomSheetBlockStart,
+    '--layout-padding-inner-y': bottomSheetThemeBlockStart,
   },
 });
 

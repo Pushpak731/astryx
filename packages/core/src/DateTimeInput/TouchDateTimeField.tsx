@@ -1429,10 +1429,7 @@ export function TouchDateTimeField({
           isOpen={isSheetOpen}
           onOpenChange={handleSheetOpenChange}
           label={t('@astryx.dateTimeInput.dialogLabel')}
-          height="hug"
-          // touchSheetBody owns the inset, including the band under the grab
-          // handle.
-          padding={0}>
+          height="hug">
           <div {...stylex.props(styles.touchSheetBody)}>{surface}</div>
         </BottomSheet>
         {showsDisabledMessage &&

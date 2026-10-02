@@ -142,10 +142,10 @@ interface BottomSheetSharedProps extends BaseProps<HTMLDivElement> {
   /**
    * Internal padding of the sheet content using the spacing scale, matching
    * Dialog. Accepts numeric spacing steps: 0, 0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10.
-   * When omitted, uses the theme default for bottom sheets (`--spacing-4`
-   * unless the theme sets `padding` on `bottom-sheet`). The padded content box
-   * is a container: a Section that is its only child escapes the padding, and
-   * bleed children such as Table and Divider compensate against it.
+   * When omitted, uses the theme default for bottom sheets: no padding unless
+   * the theme sets `padding` on `bottom-sheet`. The content box is a
+   * container: a Section that is its only child escapes the padding, and bleed
+   * children such as Table and Divider compensate against it.
    */
   padding?: SpacingStep;
 
