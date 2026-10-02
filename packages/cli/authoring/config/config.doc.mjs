@@ -61,6 +61,14 @@ export const doc = {
         "{ audience: 'internal', async handle(report, {signal}) { return sendGap(report, {signal}); } }",
     },
     {
+      name: 'discover',
+      type: 'DiscoverSource',
+      description:
+        'Tell `astryx discover` which integrations this project could add: an async function that returns a catalog. An integration can provide one too, as a `discover` named export from its manifest. Discover calls every source, yours first, and one that fails never hides the others. Discover only reads; your package manager installs.',
+      example:
+        "async ({signal, package: name, version}) => fetchCatalog({signal, name, version})",
+    },
+    {
       name: 'experimental',
       type: '{ xle?: { components?: Record<string, XleComponent> } }',
       description: 'Unstable features; may change without a breaking bump.',
@@ -69,7 +77,7 @@ export const doc = {
           name: 'experimental.xle.components',
           type: 'Record<string, XleComponent>',
           description:
-            'Custom components the layout expander (XLE) may emit, keyed by tag.',
+            'No effect. Its only reader was the removed `layout` command. The key is still accepted so existing configs keep loading; delete it.',
         },
       ],
     },

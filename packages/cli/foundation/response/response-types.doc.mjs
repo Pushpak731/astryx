@@ -38,6 +38,11 @@ export const doc = {
         'The component catalog grouped by category: `detail` (the level: names | compact | full) and `components`, the grouped map of names entries ({name, package, and optional canonical import for integrations}), brief entries, or a full ComponentDoc per entry.',
     },
     {
+      value: 'component.batch',
+      description:
+        'The component specialization of the shared `BatchResponse` and `BatchRow` types. An explicit programmatic selector array, or two or more CLI selectors, returns one ordered receipt: `count` plus `results`, one row per selector including duplicates. Every row carries `selector` and `status` (found | not_found | ambiguous | error). A found row carries `result`, the same {type, data} response as one selector. An ambiguous row carries `code`, `error`, and `candidates` ({package, component, kind, installed}). Other failed rows carry `code`, `error`, and optional `suggestions` ({name, reason}).',
+    },
+    {
       value: 'component.detail',
       description:
         "One component's authored ComponentDoc plus ownership fields (package, the owner; import, the specifier; sourceAvailable, whether source exists) and parentDoc (present when the component is documented inside another component's doc, naming that doc).",
@@ -104,21 +109,27 @@ export const doc = {
     {
       value: 'discover.list',
       description:
-        'The configured external packages (name, category, components, version, description); when empty it carries meta.configured to tell "nothing configured" from "nothing discovered".',
+        'The integrations the project loads (name, category, components, version, a list per other kind they add, and latest when a source knows it); with a discover source, meta.available lists what the project could add and meta.sources reports each source; when empty it carries meta.configured to tell "nothing configured" from "nothing discovered".',
     },
     {
       value: 'discover.detail',
-      description: 'A single external package entry, for an @scope/name query.',
+      description:
+        'One package, for an @scope/name or @scope/name@version query: what the shown version adds, whether the project has it, and, when a source knows the package, its versions, latest release, and the command that adds it.',
     },
     {
       value: 'discover.detail.doc',
       description:
-        'The validated ComponentDoc for one external component: an @scope/name/Component query, or a free-text term resolving to exactly one component.',
+        'The validated ComponentDoc for one installed component, for an @scope/name/Component query.',
+    },
+    {
+      value: 'discover.item',
+      description:
+        'One item that is not an installed component, for an @scope/name/<item> query: its kind, name, package, version, and whether the project has the package.',
     },
     {
       value: 'discover.search',
       description:
-        'The echoed query plus the matching {package, component} pairs, when a free-text term matches several components.',
+        'The echoed query plus every matching item and package across all packages, each with its kind and whether the project has it, even when only one matches; total is set when --limit cut the list.',
     },
 
     // search
@@ -306,23 +317,6 @@ export const doc = {
       value: 'integration.doc-conflicts',
       description:
         'validated (false when no integration manifest was found, so nothing was inspected), the integration identity, structural issues, and Core doc overlaps. Each finding includes `severity` (`info` | `error`) and `relationship` (`replaces` | `extends` | `accidental`).',
-    },
-
-    // layout (XLE/XLO)
-    {
-      value: 'layout.expand',
-      description:
-        'The expansion: parsed form, generated TSX code, componentsUsed, states (count of useState hooks scaffolded), todos, blocksReferenced (each {name, mode}), warnings, and written (the output path, or null when nothing was written).',
-    },
-    {
-      value: 'layout.check',
-      description:
-        'The validation result: a valid flag, the detected form, errors (each with line/col, message, formatted text, and suggestions), warnings, and the expression re-printed in both canonical surfaces (compact and outline).',
-    },
-    {
-      value: 'layout.grammar',
-      description:
-        "The XLE/XLO grammar cheatsheet: a text field with the full reference plus an aliases map (short name → canonical component) generated from this install's registry.",
     },
   ],
 };
