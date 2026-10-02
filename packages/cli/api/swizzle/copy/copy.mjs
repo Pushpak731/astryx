@@ -320,11 +320,12 @@ export async function swizzleCopy(component, options = {}) {
       usesStyleX = true;
     }
     const dest = path.join(outputDir, file);
-    written.push({
-      dest,
-      original: fs.existsSync(dest) ? fs.readFileSync(dest) : null,
-    });
     try {
+      // The snapshot read is guarded too: a destination that cannot be read
+      // back (no permission, or a directory with this name) must still undo
+      // the earlier writes and report ERR_WRITE_FAILED.
+      const original = fs.existsSync(dest) ? fs.readFileSync(dest) : null;
+      written.push({dest, original});
       fs.writeFileSync(dest, content);
     } catch (err) {
       const unrestored = undoCopy(written);

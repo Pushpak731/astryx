@@ -138,4 +138,38 @@ describe.skipIf(asRoot)('a swizzle that fails part-way undoes what it wrote', ()
       expect(fs.existsSync(path.join(outDir, file))).toBe(false);
     }
   });
+
+  it('undoes the copy when a destination cannot be read back', async () => {
+    const probe = await json(['swizzle', 'Button', '--output', 'probe']);
+    expect(probe.status, JSON.stringify(probe.body).slice(0, 200)).toBe(0);
+    const files = probe.body.data.files;
+    const outDir = path.join(dir, 'out', path.basename(probe.body.data.outputDir));
+
+    // A directory where the last file goes: the rollback snapshot cannot read
+    // it, and the earlier files are already written when the copy reaches it.
+    const first = files[0];
+    const middle = files.slice(1, -1);
+    const last = files[files.length - 1];
+    fs.mkdirSync(path.join(outDir, last), {recursive: true});
+    fs.writeFileSync(path.join(outDir, first), 'before first\n');
+
+    const {status, body} = await json([
+      'swizzle',
+      'Button',
+      '--output',
+      'out',
+      '--overwrite',
+    ]);
+
+    expect(status).toBe(1);
+    expect(body.code).toBe('ERR_WRITE_FAILED');
+    expect(body.error).toContain(last);
+    expect(body.error).toContain('Nothing was written.');
+    expect(body.error).not.toContain(dir);
+    expect(fs.readFileSync(path.join(outDir, first), 'utf8')).toBe('before first\n');
+    expect(fs.statSync(path.join(outDir, last)).isDirectory()).toBe(true);
+    for (const file of middle) {
+      expect(fs.existsSync(path.join(outDir, file))).toBe(false);
+    }
+  });
 });
