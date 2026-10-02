@@ -1061,7 +1061,7 @@ function PresentationChoice({presentation}: PresentationChoiceProps) {
           label={title}
           purpose="info"
           height="hug">
-          <VStack gap={4} style={{padding: 'var(--spacing-4)'}}>
+          <VStack gap={4}>
             <Heading level={3}>{title}</Heading>
             <Text type="supporting" color="secondary">
               Use Bottom Sheet for lightweight contextual actions, pickers, or

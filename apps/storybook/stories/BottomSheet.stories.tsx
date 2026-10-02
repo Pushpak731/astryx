@@ -120,6 +120,34 @@ export const TextOnlyFitting: Story = {
   },
 };
 
+/**
+ * Content placed directly in the sheet. The sheet pads it like Dialog, and a
+ * full-bleed Divider reaches the sheet's edges because the content box
+ * publishes its inset.
+ */
+export const ContainerPadding: Story = {
+  ...TextOnly,
+  args: {
+    isOpen: true,
+    label: 'Order summary',
+    height: 'hug',
+    children: (
+      <VStack gap={4}>
+        <Heading level={2}>Order summary</Heading>
+        <Text>
+          This content has no wrapper of its own. The sheet supplies the inset,
+          exactly as Dialog does.
+        </Text>
+        <Divider isFullBleed />
+        <Text color="secondary">
+          The divider above escapes the inset and spans the sheet.
+        </Text>
+      </VStack>
+    ),
+  },
+  play: undefined,
+};
+
 interface CommentFormValues {
   title: string;
   author: string;
