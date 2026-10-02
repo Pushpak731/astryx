@@ -12,8 +12,9 @@
  * cmd.registeredArguments, cmd.description()); examples from its CommandDoc;
  * response `type` discriminators from the returns of the FunctionDoc it wraps
  * (both attached by `defineCommand`); `--json` support from the JSON_SUPPORTED
- * allowlist in index.mjs. The only hand-kept list is CLI_LAYER_RESPONSE_TYPES,
- * for envelopes no API function returns.
+ * allowlist in index.mjs. The hand-kept lists are CLI_LAYER_RESPONSE_TYPES,
+ * for envelopes no API function returns, and ROOT_RESPONSE_TYPES, for the two
+ * (help and version) that no single command owns.
  *
  * Drift-guard tests (manifest.test.mjs) assert every registered command appears
  * in the manifest, every JSON-supported command has response types, and the
@@ -49,6 +50,14 @@ const CLI_LAYER_RESPONSE_TYPES = {
   manifest: ['manifest'],
   'theme build': ['theme.build.batch'],
 };
+
+/**
+ * Response types no single command owns: `help` (a bare `astryx --json`, and
+ * `--help --json` on any command) and `version` (`astryx --version --json`).
+ * The response-types enum lists them beside the per-command response types.
+ * @type {readonly string[]}
+ */
+export const ROOT_RESPONSE_TYPES = Object.freeze(['help', 'version']);
 
 /**
  * Map a Commander Option to a flag descriptor. Derives type from whether the

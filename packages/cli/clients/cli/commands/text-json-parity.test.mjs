@@ -372,11 +372,34 @@ const CASES = [
     skipFieldChecks: true,
   },
   {
-    name: 'integration pack',
-    args: ['integration', 'pack', '--check'],
+    name: 'integration verify',
+    args: ['integration', 'verify'],
     // Needs a packable project; pack itself may exit differently.
     skipFieldChecks: true,
   },
+  {
+    // The deprecated alias of `integration verify`.
+    name: 'integration pack',
+    args: ['integration', 'pack', '--check'],
+    skipFieldChecks: true,
+  },
+  // ── Layout command: remove these cases when the layout command is deleted ──
+  {
+    name: 'layout check',
+    args: ['layout', 'check', 'Button'],
+    skipFieldChecks: true,
+  },
+  {
+    name: 'layout expand',
+    args: ['layout', 'expand', 'Button'],
+    skipFieldChecks: true,
+  },
+  {
+    name: 'layout grammar',
+    args: ['layout', 'grammar'],
+    skipFieldChecks: true,
+  },
+  // ── End layout cases ──
   {
     name: 'manifest',
     args: ['manifest'],
