@@ -10,7 +10,7 @@
 export const doc = {
   type: 'schema',
   name: 'config',
-  displayName: 'Astryx Config',
+  displayName: 'astryx.config',
   namespace: 'authoring',
   description:
     'The optional astryx.config.* file at your project root. Declares which ' +
@@ -77,7 +77,7 @@ export const doc = {
           name: 'experimental.xle.components',
           type: 'Record<string, XleComponent>',
           description:
-            'No effect. Its only reader was the removed `layout` command. The key is still accepted so existing configs keep loading; delete it.',
+            'Custom components the layout expander (XLE) may emit, keyed by tag.',
         },
       ],
     },
