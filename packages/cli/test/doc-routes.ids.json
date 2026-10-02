@@ -991,6 +991,7 @@
     "integration",
     "integration add",
     "integration pack",
+    "integration verify",
     "layout",
     "layout check",
     "layout expand",
