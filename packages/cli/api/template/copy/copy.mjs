@@ -18,28 +18,7 @@ import {
 } from '../../../foundation/fs/path-safety.mjs';
 import {AstryxError} from '../../error.mjs';
 import {ERROR_CODES} from '../../../foundation/response/error-codes.mjs';
-import {stripTemplateAssetRefs} from '../../../foundation/discovery/template-adapter.mjs';
-
-/** The template-fixture namespace Astryx demo media lives under. */
-const FIXTURE_NAMESPACE = '/template-assets/';
-
-/** @param {string} source */
-const countFixtureRefs = source => source.split(FIXTURE_NAMESPACE).length - 1;
-
-/**
- * Replace the Astryx demo media in template source with placeholders. A
- * replaced reference leaves the fixture namespace, so the drop in count is
- * exactly what a receipt must disclose.
- * @param {string} source
- * @returns {{source: string, demoMediaReplaced: number}}
- */
-export function replaceDemoMedia(source) {
-  const output = stripTemplateAssetRefs(source);
-  return {
-    source: output,
-    demoMediaReplaced: countFixtureRefs(source) - countFixtureRefs(output),
-  };
-}
+import {replaceDemoMedia} from '../../../foundation/discovery/template-adapter.mjs';
 
 /**
  * Scaffold an already-resolved template to `targetPath` (relative to `cwd`) and
