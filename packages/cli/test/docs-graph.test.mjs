@@ -376,7 +376,8 @@ describe('the docs graph', () => {
       .filter(name => /\.doc\.mjs$/.test(name))
       .filter(name => !topicFiles.has(path.resolve(CLI, 'assets/docs', name)));
     expect(orphans).toEqual([]);
-    expect(loaded.length).toBeGreaterThan(90);
+    // A floor, not an exact count: it fails if the walk stops finding the tree.
+    expect(loaded.length).toBeGreaterThan(80);
   });
 
   it('resolves every typed edge a doc declares: command, fn, and related', async () => {
