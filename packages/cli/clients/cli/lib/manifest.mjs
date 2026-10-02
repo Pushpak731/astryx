@@ -40,15 +40,18 @@ import {commandDocsOf} from './define-command.mjs';
 import {doc as manifestDoc} from '../commands/manifest.doc.mjs';
 
 /**
- * Envelopes the CLI layer builds itself, so no FunctionDoc can declare them:
- * `manifest` wraps no API function, and `theme build` batches several
- * `themeBuild()` receipts. manifest.test.mjs fails once a FunctionDoc declares
- * one of these, so the list only shrinks.
+ * Envelopes the CLI layer builds itself, so the wrapped FunctionDoc cannot
+ * declare them: `manifest` wraps no API function, `theme build` batches several
+ * `themeBuild()` receipts, and `theme add` with no slug (or `--list`) answers
+ * with `themeListAvailable()`'s `theme.list` instead of calling `themeAdd()`.
+ * manifest.test.mjs fails once the wrapped FunctionDoc declares one of these, so
+ * the list only shrinks.
  * @type {Record<string, string[]>}
  */
 const CLI_LAYER_RESPONSE_TYPES = {
   manifest: ['manifest'],
   'theme build': ['theme.build.batch'],
+  'theme add': ['theme.list'],
 };
 
 /**

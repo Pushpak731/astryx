@@ -51,6 +51,7 @@ const functionDocs = await loadDocs(path.join(HERE, '../../../api'), 'function')
 const CLI_LAYER_TYPES = {
   manifest: ['manifest'],
   'theme build': ['theme.build.batch'],
+  'theme add': ['theme.list'],
 };
 
 const manifest = buildManifest(program, {jsonSupported: JSON_SUPPORTED, version: '0.0.0-test'});
@@ -138,6 +139,15 @@ describe('manifest: drift guards', () => {
     expect(status).toBe(0);
     expect(JSON.parse(stdout).type).toBe('upgrade.registry');
     expect(manifest.responseTypes.upgrade).toContain('upgrade.registry');
+  });
+
+  it('lists theme.list for theme add, which lists themes when given no slug', async () => {
+    const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'astryx-manifest-'));
+    fs.writeFileSync(path.join(cwd, 'package.json'), '{"name":"app","version":"1.0.0"}');
+    const {status, stdout} = await runCli(['--json', 'theme', 'add'], {cwd});
+    expect(status).toBe(0);
+    expect(JSON.parse(stdout).type).toBe('theme.list');
+    expect(manifest.responseTypes['theme add']).toContain('theme.list');
   });
 
   it('takes response types from the wrapped FunctionDoc, plus CLI-layer envelopes', () => {
