@@ -48,14 +48,13 @@ describe('template.show', () => {
     expect(withFixtures).toBeGreaterThan(0);
   }, SLOW);
 
-  it('reports how many demo media references it replaced, 0 for none', () => {
-    const count = (/** @type {string} */ s) => s.split(FIXTURE).length - 1;
+  it('reports a replaced count when the source changed, and 0 when it did not', () => {
     let reported = 0;
     for (const match of templates) {
       const raw = read(match.filePath);
       const {source, demoMediaReplaced} = templateShow(match).data;
-      expect(demoMediaReplaced, match.dirName).toBe(count(raw) - count(source));
-      if (count(raw) === 0) expect(demoMediaReplaced, match.dirName).toBe(0);
+      if (source === raw) expect(demoMediaReplaced, match.dirName).toBe(0);
+      else expect(demoMediaReplaced, match.dirName).toBeGreaterThan(0);
       reported += demoMediaReplaced;
     }
     expect(reported).toBeGreaterThan(0);

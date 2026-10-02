@@ -320,9 +320,23 @@ function toPosixPath(p) {
  * @returns {string} Source with demo asset references replaced.
  */
 export function stripTemplateAssetRefs(source) {
+  return replaceDemoMedia(source).source;
+}
+
+/**
+ * {@link stripTemplateAssetRefs}, plus how many references it replaced: one per
+ * replaced reference, however many fixture paths its URL carries (a reference
+ * is replaced whole, query included), and none for a prose mention or a
+ * third-party URL left as written. That count is what a receipt discloses.
+ *
+ * @param {string} source - Template source code.
+ * @returns {{source: string, demoMediaReplaced: number}}
+ */
+export function replaceDemoMedia(source) {
   const needle = `/${FIXTURE_SEGMENT}`;
   let output = '';
   let copied = 0;
+  let demoMediaReplaced = 0;
   /** @type {Array<[number, number]> | undefined} */
   let comments;
   let at = source.indexOf(needle);
@@ -343,31 +357,11 @@ export function stripTemplateAssetRefs(source) {
     if (edit) {
       output += source.slice(copied, start) + edit.text;
       copied = edit.end;
+      demoMediaReplaced += 1;
     }
     at = source.indexOf(needle, end);
   }
-  return output + source.slice(copied);
-}
-
-/** The template-fixture namespace Astryx demo media lives under. */
-const FIXTURE_NAMESPACE = `/${FIXTURE_SEGMENT}/`;
-
-/** @param {string} source */
-const countFixtureRefs = source => source.split(FIXTURE_NAMESPACE).length - 1;
-
-/**
- * Replace the Astryx demo media in template source with placeholders. A
- * replaced reference leaves the fixture namespace, so the drop in count is
- * exactly what a receipt must disclose.
- * @param {string} source
- * @returns {{source: string, demoMediaReplaced: number}}
- */
-export function replaceDemoMedia(source) {
-  const output = stripTemplateAssetRefs(source);
-  return {
-    source: output,
-    demoMediaReplaced: countFixtureRefs(source) - countFixtureRefs(output),
-  };
+  return {source: output + source.slice(copied), demoMediaReplaced};
 }
 
 /** @param {string | undefined} char */
