@@ -160,7 +160,8 @@ integration items are described.
      shown);
   4. no built theme module is imported without its stylesheet;
   5. every added local theme is built, and its outputs match its source;
-  6. no added theme sets a private `--_*` variable;
+  6. no added theme sets a private `--_*` variable directly
+     (`architecture:theme-compilation` INV6);
   7. every added theme's `@astryxdesign/core` peer range accepts the installed
      Core;
   8. the default theme is one of the added themes;
