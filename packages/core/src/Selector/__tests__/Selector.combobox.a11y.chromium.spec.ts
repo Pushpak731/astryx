@@ -25,12 +25,10 @@ test.afterAll(async () => {
   await storybook?.close();
 });
 
-async function openScenario(page: Page, open: boolean): Promise<void> {
-  if (!open) {
-    return;
+async function awaitScenario(page: Page, open: boolean): Promise<void> {
+  if (open) {
+    await expect(page.getByRole('listbox')).toBeVisible();
   }
-  await page.getByRole('combobox', {name: 'Fruit'}).click();
-  await expect(page.getByRole('listbox')).toBeVisible();
 }
 
 for (const scenario of SELECTOR_COMBOBOX_SCENARIOS) {
@@ -39,7 +37,7 @@ for (const scenario of SELECTOR_COMBOBOX_SCENARIOS) {
       `${storybook.origin}/iframe.html?id=${scenario.storyId}&viewMode=story`,
       {waitUntil: 'load'},
     );
-    await openScenario(page, scenario.open);
+    await awaitScenario(page, scenario.open);
 
     const subject = page.getByRole('combobox', {name: 'Fruit'});
     const related: Record<string, Locator> = {};

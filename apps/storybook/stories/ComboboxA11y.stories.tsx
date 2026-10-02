@@ -2,12 +2,14 @@
 
 /** Checked-in browser fixtures for Selector's Combobox contract binding. */
 
+import {expect, userEvent, within} from 'storybook/test';
 import type {Meta, StoryObj} from '@storybook/react';
 import {Selector} from '@astryxdesign/core/Selector';
 
 const meta: Meta<typeof Selector> = {
-  title: 'Core/Accessibility/Combobox',
+  title: 'a11y/Combobox pattern',
   component: Selector,
+  tags: ['no-visual'],
   parameters: {layout: 'centered'},
   decorators: [
     Story => (
@@ -30,7 +32,16 @@ export default meta;
 type Story = StoryObj<typeof Selector>;
 
 export const SelectorClosed: Story = {};
-export const SelectorOpen: Story = {};
+export const SelectorOpen: Story = {
+  play: async ({canvasElement}) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole('combobox', {name: 'Fruit'}));
+    await expect(canvas.getByRole('combobox', {name: 'Fruit'})).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+  },
+};
 export const SelectorReadOnly: Story = {
   args: {isReadOnly: true, value: 'apple'},
 };

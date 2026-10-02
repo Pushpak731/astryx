@@ -30,14 +30,14 @@ export const SELECTOR_COMBOBOX_SCENARIOS: ReadonlyArray<SelectorComboboxScenario
   [
     {
       id: 'closed',
-      storyId: 'core-accessibility-combobox--selector-closed',
+      storyId: 'a11y-combobox-pattern--selector-closed',
       open: false,
       props: {},
       facts: baseFacts,
     },
     {
       id: 'open',
-      storyId: 'core-accessibility-combobox--selector-open',
+      storyId: 'a11y-combobox-pattern--selector-open',
       open: true,
       props: {},
       facts: {
@@ -49,14 +49,14 @@ export const SELECTOR_COMBOBOX_SCENARIOS: ReadonlyArray<SelectorComboboxScenario
     },
     {
       id: 'read-only',
-      storyId: 'core-accessibility-combobox--selector-read-only',
+      storyId: 'a11y-combobox-pattern--selector-read-only',
       open: false,
       props: {isReadOnly: true, value: 'apple'},
       facts: {...baseFacts, readOnly: true},
     },
     {
       id: 'busy',
-      storyId: 'core-accessibility-combobox--selector-busy',
+      storyId: 'a11y-combobox-pattern--selector-busy',
       open: false,
       props: {isLoading: true},
       facts: {...baseFacts, busy: true},
