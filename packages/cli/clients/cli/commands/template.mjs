@@ -66,8 +66,16 @@ export function registerTemplate(program) {
        * @param {{list?: boolean, type?: string, package?: string, skeleton?: boolean, cdn?: boolean | string, overwrite?: boolean}} options
        */
       async (name, targetPath, options) => {
-      rejectEmptyArgument('name', name, 'astryx template');
-      rejectEmptyArgument('path', targetPath, 'astryx template');
+      // Reject an empty positional only where the chosen mode uses it, by the
+      // flag precedence in template.doc.mjs: --cdn ignores <name> and takes
+      // <path> only when the flag has no value of its own, --list ignores both,
+      // and --skeleton ignores <path>.
+      const usesName = !options.cdn && !options.list;
+      const usesPath = options.cdn
+        ? typeof options.cdn !== 'string'
+        : !options.list && !options.skeleton;
+      if (usesName) rejectEmptyArgument('name', name, 'astryx template');
+      if (usesPath) rejectEmptyArgument('path', targetPath, 'astryx template');
       const json = program.opts().json || false;
       const run = getCliInvocation();
 

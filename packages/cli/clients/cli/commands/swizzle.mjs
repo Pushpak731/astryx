@@ -27,7 +27,11 @@ export function registerSwizzle(program) {
   defineCommand(program, swizzleCommand, {
     fn: swizzleFn,
     action: async (/** @type {string | undefined} */ component, /** @type {{output: string, package?: string, list?: boolean, overwrite?: boolean}} */ options) => {
-      rejectEmptyArgument('component', component, 'astryx swizzle');
+      // --list lists and ignores <component>, so an empty one is rejected only
+      // when it is used.
+      if (!options.list) {
+        rejectEmptyArgument('component', component, 'astryx swizzle');
+      }
       const json = program.opts().json || false;
       const run = getCliInvocation();
 

@@ -13,6 +13,9 @@ ERR_INVALID_ARGUMENT.
 
 `template`, `swizzle` and `discover` now reject an empty positional with
 ERR_INVALID_ARGUMENT and exit 1, in both text and `--json`. Omitting the
-argument still lists, exactly as before.
+argument still lists, exactly as before. A positional that the chosen mode
+ignores stays ignored when it is empty, as each flag documents: `template
+--list` ignores both, `--cdn` ignores `<name>`, `--skeleton` ignores `<path>`,
+and `swizzle --list` ignores `<component>`.
 
 @josephfarina

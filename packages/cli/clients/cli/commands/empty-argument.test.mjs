@@ -73,6 +73,26 @@ describe('an empty-string argument is rejected, not ignored', () => {
     expect(stderr).toContain('<name>');
   });
 
+  it('leaves an empty argument alone where the chosen mode ignores it', async () => {
+    for (const [args, type] of [
+      [['template', '', '--list'], 'template.list'],
+      [['template', '', '--cdn'], 'template.cdn'],
+      [['template', 'ai-chat', '', '--skeleton'], 'template.skeleton'],
+      [['swizzle', '', '--list'], 'swizzle.list'],
+    ]) {
+      const {status, body} = await json(args);
+      expect(status, `${args.join(' ')}: ${JSON.stringify(body).slice(0, 200)}`).toBe(0);
+      expect(body.type).toBe(type);
+    }
+  });
+
+  it('still rejects an empty <path> that a bare --cdn would write to', async () => {
+    const {status, body} = await json(['template', 'ai-chat', '', '--cdn']);
+    expect(status).toBe(1);
+    expect(body.code).toBe('ERR_INVALID_ARGUMENT');
+    expect(body.error).toContain('<path>');
+  });
+
   it('still lists when the argument is genuinely omitted', async () => {
     for (const [args, type] of [
       [['template', '--list'], 'template.list'],
