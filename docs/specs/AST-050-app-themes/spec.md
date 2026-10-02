@@ -138,10 +138,11 @@ integration items are described.
   with no `src` folder. A theme directory there, with the same shape as an
   integration theme (`architecture:cli-surface` INV19), is listed and added like
   a package theme. Its built module and stylesheet are the files `theme build`
-  writes beside its source. `theme add` MUST fail and name the build command
-  when they are missing. When a local theme and a package theme share a slug,
-  `theme add <slug>` adds the local theme unless `--package` names the package,
-  and `theme list` shows both with their owners.
+  writes beside its source, and its font stylesheet, when it has one, is
+  `<slug>.fonts.css` beside them. `theme add` MUST fail and name the build
+  command when the built module or stylesheet is missing. When a local theme and
+  a package theme share a slug, `theme add <slug>` adds the local theme unless
+  `--package` names the package, and `theme list` shows both with their owners.
 - **FR9 — The module imports built themes only.** The generated module MUST
   import built themes, their stylesheets, and their font stylesheets when the
   package exports one, never theme source for runtime style injection, so every
