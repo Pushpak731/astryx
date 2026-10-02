@@ -81,6 +81,7 @@ export const TextOnly: Story = {
     const [isOpen, setIsOpen] = useState(true);
     return (
       <BottomSheet
+        padding={0}
         {...standaloneArgs}
         isOpen={isOpen}
         onOpenChange={setIsOpen}
@@ -126,7 +127,6 @@ export const TextOnlyFitting: Story = {
  * publishes its inset.
  */
 export const ContainerPadding: Story = {
-  ...TextOnly,
   args: {
     isOpen: true,
     label: 'Order summary',
@@ -145,7 +145,17 @@ export const ContainerPadding: Story = {
       </VStack>
     ),
   },
-  play: undefined,
+  render: args => {
+    const standaloneArgs = args as StandaloneBottomSheetStoryProps;
+    const [isOpen, setIsOpen] = useState(true);
+    return (
+      <BottomSheet
+        {...standaloneArgs}
+        isOpen={isOpen}
+        onOpenChange={setIsOpen}
+      />
+    );
+  },
 };
 
 interface CommentFormValues {
