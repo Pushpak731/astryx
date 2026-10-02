@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "version": "0.6.5",
+  "branch": "release/v0.6.5",
+  "cutSha": "ebd939b665361a078015377c0dfe50cc3c1d70a4",
+  "changesets": [
+    {
+      "path": ".changeset/button-shrinks-in-narrow-rows.md",
+      "sha256": "648a0545da7a735e758fcf46d4e614306a1c0f33e1ca904dc593a8036a008834"
+    },
+    {
+      "path": ".changeset/cli-component-batch-lookups.md",
+      "sha256": "e50a03ef29b75919a73adeda019b0fd029fc26a124d4c6767fb33aeb7accb817"
+    },
+    {
+      "path": ".changeset/cli-docs-last-pass.md",
+      "sha256": "70d365ec4b3888ea59e05dcfb6e7d0944ce318c28a64c715af202ef7deae7d8a"
+    },
+    {
+      "path": ".changeset/cli-doctor-validates-integrations.md",
+      "sha256": "31dbab5118eb73d5e24f1937492b2369da7ce8232eafdca7b5751e90f5f70ec8"
+    },
+    {
+      "path": ".changeset/cli-files-changed-counts-files.md",
+      "sha256": "350205ab72836c7589051ba51884c58e40a5693e21655efb1f03791f2900002c"
+    },
+    {
+      "path": ".changeset/cli-parse-error-astryx-format.md",
+      "sha256": "cc6ecb26634c11de2f6b8e7680e3dda3a7380dd5373f7165d317af2bc649eaa0"
+    },
+    {
+      "path": ".changeset/cli-reference-last-pass.md",
+      "sha256": "dfd367d2423c6b0d114248d667294a4f777eb6f6ead02ccbdf6cb232ce6aafd2"
+    },
+    {
+      "path": ".changeset/cli-spec-pack-check-lifecycle-output.md",
+      "sha256": "5a71ab41ef7e1a874d47219edc75a21e1e340c90ddbe735d784ade8e7046224f"
+    },
+    {
+      "path": ".changeset/discover-integration-manager.md",
+      "sha256": "7a5dcb31e11097727a5ecd179b72453a94fb4ecccc2c07ef851a9b83ebdc16d8"
+    },
+    {
+      "path": ".changeset/doctor-integration-docs-placement.md",
+      "sha256": "56391b012265a913b21d869d51a819fee3128e453719bdc3da5fd72356e4a90b"
+    },
+    {
+      "path": ".changeset/integration-themes-need-cli.md",
+      "sha256": "3d73deb2d385a5df6eec5fdbae74abc11b777c83a5ef3ed963dd251a7ba744b8"
+    },
+    {
+      "path": ".changeset/integration-verify-packed-imports.md",
+      "sha256": "7de3d46045261f94458f31f1539e39423f226cc0ccdfe19b501d78576db3735f"
+    },
+    {
+      "path": ".changeset/integration-verify.md",
+      "sha256": "bc086fc0a13c20b2838382a60f93d9103f38e0b5e6f06ac68f24d3ffdd82b80d"
+    },
+    {
+      "path": ".changeset/lean-runtime-i18n.md",
+      "sha256": "4b36e6c44511580b410651169b5e6500cc04ac947d50b441db3847730c9e7ea3"
+    },
+    {
+      "path": ".changeset/popover-surface-padding.md",
+      "sha256": "b626122234ba08cd87eb5fe69aa3f68459672ba934e771b295c828fcd5477a2f"
+    },
+    {
+      "path": ".changeset/quiet-tokens-share.md",
+      "sha256": "d6edeb2c6617a8a4cf7ebd32330d4182fac7991fcc0a8aeaa468dee9efb8a52e"
+    },
+    {
+      "path": ".changeset/segmented-control-hug-caps.md",
+      "sha256": "28db4f7d5a105aaa8a3916a76630104fec6e3d67503737c52c24404a383c926a"
+    },
+    {
+      "path": ".changeset/selectable-card-focusable-disabled.md",
+      "sha256": "3e8a74403a670eea5f65d5f72eb6e195767bd3ec489a5b75ea00ba69916ffe24"
+    },
+    {
+      "path": ".changeset/selector-caps-spacing-row-to-size-token.md",
+      "sha256": "72248fded4924428e237dc76e1640df093a8174ee23cf36703a8f875c1da1620"
+    },
+    {
+      "path": ".changeset/switch-busy-announcement.md",
+      "sha256": "d97ea19d1365f779aec7d4952564a80b8bd6fe44938460c0b4eed9b3a67d0dee"
+    },
+    {
+      "path": ".changeset/theme-writes-roll-back.md",
+      "sha256": "6b0f17888baf7a867f37c547c6581b9a752f94b3bca9d22f034189be0bd8d384"
+    }
+  ]
+}
