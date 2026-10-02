@@ -145,7 +145,7 @@ export function cliError(message, options = {}) {
  * ERR_INVALID_ARGUMENT; zero characters has to fail the same way.
  *
  * Call this from a handler whose argument has no other source. A command that
- * can take the same value from `--file` or stdin (layout) is the opposite case:
+ * can take the same value from `--file` or stdin is the opposite case:
  * an empty positional there really does mean "not given as an argument", and it
  * has its own ERR_MISSING_ARGUMENT for it.
  *

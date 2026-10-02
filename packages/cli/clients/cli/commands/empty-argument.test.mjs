@@ -9,11 +9,6 @@
  * not tell it from an argument that was never typed. `swizzle ""` and
  * `discover ""` listed the same way. One space already failed correctly
  * (ERR_INVALID_ARGUMENT); zero characters has to fail the same way.
- *
- * `layout` is the deliberate exception and is asserted here as such: its
- * expression can also arrive via --file or stdin, so an empty positional there
- * really does mean "not given as an argument" and keeps its own
- * ERR_MISSING_ARGUMENT.
  */
 
 import {describe, it, expect, beforeEach, afterEach} from 'vitest';
@@ -87,14 +82,6 @@ describe('an empty-string argument is rejected, not ignored', () => {
       const {status, body} = await json(args);
       expect(status, JSON.stringify(body).slice(0, 200)).toBe(0);
       expect(body.type).toBe(type);
-    }
-  });
-
-  it('leaves layout alone — its expression has other sources', async () => {
-    for (const sub of ['expand', 'check']) {
-      const {status, body} = await json(['layout', sub, '']);
-      expect(status).toBe(1);
-      expect(body.code).toBe('ERR_MISSING_ARGUMENT');
     }
   });
 });

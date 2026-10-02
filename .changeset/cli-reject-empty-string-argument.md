@@ -15,8 +15,4 @@ ERR_INVALID_ARGUMENT.
 ERR_INVALID_ARGUMENT and exit 1, in both text and `--json`. Omitting the
 argument still lists, exactly as before.
 
-`layout` is deliberately unchanged: its expression can also arrive via `--file`
-or stdin, so an empty positional there really does mean "not given as an
-argument" and keeps its own ERR_MISSING_ARGUMENT.
-
 @josephfarina
