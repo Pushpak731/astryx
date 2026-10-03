@@ -29,6 +29,7 @@ const evidence: Record<string, unknown> = {};
 test.beforeAll(async () => {
   fs.rmSync(OUTPUT, {recursive: true, force: true});
   fs.mkdirSync(OUTPUT, {recursive: true});
+  evidence.headSha = process.env.ASTRYX_HEAD_SHA ?? null;
   storybook = await serveStorybook(
     process.env.ASTRYX_STORYBOOK_DIR ?? DEFAULT_STORYBOOK_DIR,
   );
