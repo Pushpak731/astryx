@@ -50,8 +50,8 @@ This table is a review projection; the body below is authoritative.
 
 ## Intent
 
-A picker shows a panel of options. Sometimes an option carries a second verb
-beside its first: a saved label that can be edited, a saved search that can be
+A picker's combobox opens a popup panel of options. Sometimes an option in
+that open panel carries a second verb beside its first: a saved label that can be edited, a saved search that can be
 renamed, a recent value that can be removed. The person needs to press that
 control without also picking the option, and a screen-reader user needs to
 know it exists and reach it.
@@ -63,8 +63,10 @@ control is invalid wherever it lands. Builders drop the verb or rebuild the
 list.
 
 This record owns one answer: **an option carries its actions as nodes the
-caller renders, and a panel holding any such option is a grid whose rows pair
-the option with its actions.** The combobox contract is kept, the keyboard path exists without a
+caller renders, and a popup panel holding any such option is a grid whose
+rows pair the option with its actions.** The action lives beside the option
+inside the open popup; nothing here touches the collapsed trigger, whose
+own controls (clear, chevron, status) keep their current contracts. The combobox contract is kept, the keyboard path exists without a
 second surface, and no caller writes guard code for rows that have none.
 
 The trigger is [#6828](https://github.com/facebook/astryx/pull/6828), which
@@ -133,6 +135,9 @@ the capability belongs to the shared option type so that `Selector`,
   role; a caller there already renders rows with controls.
 - **A theme target for the actions cell.** Whether one is admitted is each
   component's theming record.
+- **Controls on the collapsed trigger.** A clear button, a chevron, a status
+  icon, or anything else a caller composes around the closed control is not
+  an option action and is not governed here.
 - **The action's handler semantics.** What Edit does — open a dialog, mutate
   in place — is the caller's. The panel neither closes nor re-filters because
   an action fired; the handler may. Whether a row leaves after its action
@@ -445,14 +450,19 @@ changes role as a caller filters would be worse than either mode.
 
 - **OQ1 — How many entries may one cell hold before within-cell movement is specified?** (`human-api`)
 
-  The key admits an array because two verbs were the case that defeated a
-  single action. FR10 warns in development above one until a later record
-  settles how the highlight walks several controls inside one cell. Options:
-  (a) keep FR10 as written — the key is final, the reach for the second
-  entry is owed; (b) settle the walk now, which widens this record into the
-  in-cell focus question the owner set aside; (c) narrow the key to one
-  entry and widen later, which the shape test argues against. The record is
-  written for (a).
+  **Recommendation: one.** One entry per cell needs no within-cell keyboard
+  model — the inline-end arrow lands on the only control there, and Enter
+  fires it — which is exactly the piece set aside in Non-goals, with the
+  repository's tree-walking focus precedents named for whenever it resumes.
+  Several controls in one cell is the case that forces that work. The key
+  stays an array so the shape does not change when the walk is specified;
+  what is capped is how many entries a host accepts without warning.
+  Options: (a) cap at one — a row carrying more than one entry warns in
+  development and only the first is reachable, as FR10 already says, and the
+  cap is lifted by the later record rather than by this one; (b) settle the
+  walk now, which widens this record into the in-cell focus question the
+  owner parked; (c) narrow the key to a single node and widen later, which
+  the shape test argues against. The record is written for (a).
 
 ## Content boundary
 
