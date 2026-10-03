@@ -18,7 +18,7 @@ import {spawnSync} from 'node:child_process';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
-const resultsDir = join(root, 'results');
+const resultsDir = join(root, 'outputs');
 const srcDir = join(here, 'src');
 rmSync(srcDir, {recursive: true, force: true});
 

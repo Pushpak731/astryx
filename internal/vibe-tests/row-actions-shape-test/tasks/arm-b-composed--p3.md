@@ -3,6 +3,7 @@ You are running a vibe test.
 You have NO prior knowledge of the system under test. Do NOT use prior knowledge of any specific component library, product, or convention beyond React and TypeScript themselves.
 
 ## Reference
+
 The reference below is your ONLY documentation. Use ONLY what is documented there. Do not invent props, components, or imports that it does not mention; if you need something it does not provide, say so and build it from plain React instead.
 
 <reference>
@@ -20,18 +21,18 @@ whole row is the click target and it is one tab stop.
 
 ## ListItem props
 
-| prop | type | default |
-| --- | --- | --- |
-| `label` | `ReactNode` | — |
-| `description` | `ReactNode` | — |
-| `startContent` | `ReactNode` | — |
-| `endContent` | `ReactNode` | — |
-| `onClick` | `(event: MouseEvent) => void` | — |
-| `href` | `string` | — |
-| `isDisabled` | `boolean` | `false` |
-| `isSelected` | `boolean` | `false` |
-| `actions` | `ReactNode` | — |
-| `actionsReveal` | `'always' \| 'adaptive'` | `'always'` |
+| prop            | type                          | default    |
+| --------------- | ----------------------------- | ---------- |
+| `label`         | `ReactNode`                   | —          |
+| `description`   | `ReactNode`                   | —          |
+| `startContent`  | `ReactNode`                   | —          |
+| `endContent`    | `ReactNode`                   | —          |
+| `onClick`       | `(event: MouseEvent) => void` | —          |
+| `href`          | `string`                      | —          |
+| `isDisabled`    | `boolean`                     | `false`    |
+| `isSelected`    | `boolean`                     | `false`    |
+| `actions`       | `ReactNode`                   | —          |
+| `actionsReveal` | `'always' \| 'adaptive'`      | `'always'` |
 
 `endContent` is always visible and is the place for information about the
 row. Icons come from `<Icon name="…" />`.
@@ -56,7 +57,11 @@ A plain navigating list:
 
 ```tsx
 <List>
-  <ListItem label="Inbox" description="12 unread" onClick={() => go('/inbox')} />
+  <ListItem
+    label="Inbox"
+    description="12 unread"
+    onClick={() => go('/inbox')}
+  />
   <ListItem label="Sent" onClick={() => go('/sent')} />
 </List>
 ```
@@ -65,13 +70,17 @@ Rows with a secondary action:
 
 ```tsx
 <List>
-  {items.map((item) => (
+  {items.map(item => (
     <ListItem
       key={item.id}
       label={item.name}
       onClick={() => open(item.id)}
       actions={
-        <ListItemAction label="Share" icon={<Icon name="share" />} onClick={() => share(item.id)} />
+        <ListItemAction
+          label="Share"
+          icon={<Icon name="share" />}
+          onClick={() => share(item.id)}
+        />
       }
     />
   ))}
@@ -87,13 +96,17 @@ Put it in `actions`.
 </reference>
 
 ## Task
+
 Build a notifications list. Each row can be marked read or unread (whichever it currently is not), pinned or unpinned, snoozed, or deleted: four verbs on every row. A colleague who uses only the keyboard must be able to do all four on any row. Assume `notifications` (with `id`, `title`, `isRead`, `isPinned`), `markRead(id, isRead)`, `pin(id, isPinned)`, `snooze(id)` and `remove(id)` already exist.
 
 ## Output
+
 Reply with exactly two sections:
 
 ### Code
+
 One complete TSX component in a single ```tsx fenced block.
 
 ### Notes
+
 Plain prose, no scores: what you reached for first, where you hesitated, anything you wanted but could not find in the reference, and any workarounds you used. Do not grade yourself.

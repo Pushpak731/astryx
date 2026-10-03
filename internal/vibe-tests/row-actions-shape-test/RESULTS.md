@@ -142,5 +142,5 @@ the menu item vocabulary rather than a four-tone enum (OQ for the owner).
 - [`prompts.json`](prompts.json) — battery and ground truth
 - [`gen-docs.mjs`](gen-docs.mjs) → [`docs/`](docs/) — one template, four arms
 - [`tasks/`](tasks/) — the 15 self-contained task prompts as sent
-- [`results/`](results/) — raw outputs, code and self-report, one file per agent
+- [`outputs/`](outputs/) — raw outputs, code and self-report, one file per agent
 - [`typecheck/check.mjs`](typecheck/check.mjs) → `typecheck/summary.json` — tsc against per-arm stubs

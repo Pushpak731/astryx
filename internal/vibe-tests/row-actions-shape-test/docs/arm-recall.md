@@ -12,16 +12,16 @@ whole row is the click target and it is one tab stop.
 
 ## ListItem props
 
-| prop | type | default |
-| --- | --- | --- |
-| `label` | `ReactNode` | — |
-| `description` | `ReactNode` | — |
-| `startContent` | `ReactNode` | — |
-| `endContent` | `ReactNode` | — |
-| `onClick` | `(event: MouseEvent) => void` | — |
-| `href` | `string` | — |
-| `isDisabled` | `boolean` | `false` |
-| `isSelected` | `boolean` | `false` |
+| prop           | type                          | default |
+| -------------- | ----------------------------- | ------- |
+| `label`        | `ReactNode`                   | —       |
+| `description`  | `ReactNode`                   | —       |
+| `startContent` | `ReactNode`                   | —       |
+| `endContent`   | `ReactNode`                   | —       |
+| `onClick`      | `(event: MouseEvent) => void` | —       |
+| `href`         | `string`                      | —       |
+| `isDisabled`   | `boolean`                     | `false` |
+| `isSelected`   | `boolean`                     | `false` |
 
 `endContent` is always visible and is the place for information about the
 row. Icons come from `<Icon name="…" />`.
@@ -39,7 +39,11 @@ A plain navigating list:
 
 ```tsx
 <List>
-  <ListItem label="Inbox" description="12 unread" onClick={() => go('/inbox')} />
+  <ListItem
+    label="Inbox"
+    description="12 unread"
+    onClick={() => go('/inbox')}
+  />
   <ListItem label="Sent" onClick={() => go('/sent')} />
 </List>
 ```
