@@ -36,15 +36,15 @@ review_triggers: [public-api, accessibility, behavior]
 
 ## Contract at a glance
 
-| Area                    | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Public contract         | An option carries its secondary controls as nodes: `actions?: ReactNode[]`, one entry per control, one key with one type on both option vocabularies a picker panel renders from — `SelectorOptionData` and `SearchableItem` (FR1, DEC-1, DEC-4). Astryx ships the component that goes in them, `OptionAction` (`{label, icon?, onActivate, isDisabled?, variant?}`); a caller who needs more passes their own node.                                                                           |
-| Behavior                | A panel whose options carry no actions is the listbox it is today. Once any declared option carries an action, the panel is a grid: each option is a row with two cells, the option and its actions (FR2, FR3, DEC-2, DEC-3). Up/Down move rows; the inline-end arrow reaches the action; Enter activates it; pointer and touch press it directly (FR4, FR5). Activating an action never changes the selection (FR4). The action is always visible (FR8).                                      |
-| End-user impact         | A person picking a label can also edit it from the same panel, with a mouse, a finger, a keyboard, or a screen reader, and pressing Edit never also toggles the label. Today the only place a product can put that control fires the option too and is invalid for assistive technology.                                                                                                                                                                                                       |
-| Builder impact          | One optional key on the option object holding `<OptionAction …/>` nodes. No render prop, no guard code for rows without actions; a bespoke control is an ordinary node in the same array. Nothing changes for a caller who declares none.                                                                                                                                                                                                                                                      |
-| Compatibility/readiness | Additive. Every current picker renders exactly as before; the grid exists only when a caller declares an action (DEC-5, decided). Authority: `draft`, `approved_by` `null`. Two owner questions are open; OQ1 changes the public shape, OQ2 bounds what a cell may hold.                                                                                                                                                                                                                       |
-| Review checks           | Reject a control rendered inside `role="option"`; a `role="none"` or `role="group"` wrapper standing between a listbox and a control; a host that inspects an `actions` entry's children; a handler on `OptionAction` not named `onActivate`; a panel whose role follows the filtered view rather than the declared options; a row with any number of cells other than two; an action reachable only by pointer; a Tab stop added inside the panel; a hover-revealed or swipe-revealed action. |
-| Governing rules         | [`spec:AST-002`](../AST-002/spec.md) FR1, FR4, FR15, FR16, `DEC-1`, `DEC-6`; [`architecture:public-component-api`](../../architecture/public-component-api.md) INV1, INV2, INV3, INV9; [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV7; [`spec:AST-056`](../AST-056/spec.md) AR1 for the empty state's announcement; `component:DropdownMenu` for the item-data vocabulary this record reuses.                                                    |
+| Area                    | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public contract         | An option declares its secondary controls as data: `actions?: OptionAction[]`, one key with one type on both option vocabularies a picker panel renders from — `SelectorOptionData` and `SearchableItem` (FR1, DEC-1, DEC-4). `OptionAction` is `{label, icon?, onActivate, isDisabled?, variant?}`, the menu-row vocabulary with core's handler name.                                                                                                                                       |
+| Behavior                | A panel whose options carry no actions is the listbox it is today. Once any declared option carries an action, the panel is a grid: each option is a row with two cells, the option and its actions (FR2, FR3, DEC-2, DEC-3). Up/Down move rows; the inline-end arrow reaches the action; Enter activates it; pointer and touch press it directly (FR4, FR5). Activating an action never changes the selection (FR4). The action is always visible (FR8).                                    |
+| End-user impact         | A person picking a label can also edit it from the same panel, with a mouse, a finger, a keyboard, or a screen reader, and pressing Edit never also toggles the label. Today the only place a product can put that control fires the option too and is invalid for assistive technology.                                                                                                                                                                                                     |
+| Builder impact          | One optional key on the option object, in the shape `MoreMenu.items` already takes. No new component, no render prop, no guard code for rows without actions. Nothing changes for a caller who declares none.                                                                                                                                                                                                                                                                                |
+| Compatibility/readiness | Additive. Every current picker renders exactly as before; the grid exists only when a caller declares an action (DEC-5, decided). Authority: `draft`, `approved_by` `null`. Two owner questions are open; OQ1 changes the public shape, OQ2 bounds what a cell may hold.                                                                                                                                                                                                                     |
+| Review checks           | Reject a control rendered inside `role="option"`; a `role="none"` or `role="group"` wrapper standing between a listbox and a control; a node-typed action entry; a host that inspects an action's `icon`; a handler not named `onActivate`; a panel whose role follows the filtered view rather than the declared options; a row with any number of cells other than two; an action reachable only by pointer; a Tab stop added inside the panel; a hover-revealed or swipe-revealed action. |
+| Governing rules         | [`spec:AST-002`](../AST-002/spec.md) FR1, FR4, FR15, FR16, `DEC-1`, `DEC-6`; [`architecture:public-component-api`](../../architecture/public-component-api.md) INV1, INV2, INV3, INV9; [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV7; [`spec:AST-056`](../AST-056/spec.md) AR1 for the empty state's announcement; `component:DropdownMenu` for the item-data vocabulary this record reuses.                                                  |
 
 This table is a review projection; the body below is authoritative.
 
@@ -62,9 +62,9 @@ and `role="listbox"` permits only `option` and `group` children, so the
 control is invalid wherever it lands. Builders drop the verb or rebuild the
 list.
 
-This record owns one answer: **an option carries its actions as nodes, the
-system ships the control that goes in them, and a panel holding any such
-option is a grid whose rows pair the option with its actions.** The combobox contract is kept, the keyboard path exists without a
+This record owns one answer: **an option declares its actions as data, and a
+panel holding any such option is a grid whose rows pair the option with its
+actions.** The combobox contract is kept, the keyboard path exists without a
 second surface, and no caller writes guard code for rows that have none.
 
 The trigger is [#6828](https://github.com/facebook/astryx/pull/6828), which
@@ -77,9 +77,9 @@ the capability belongs to the shared option type so that `Selector`,
 
 **Owns**
 
-- That an option's secondary controls are carried on the option as nodes, the
-  name and type of that key across every option vocabulary a picker panel
-  renders from, and the shipped control that fills it.
+- That an option's secondary controls are declared as data on the option, and
+  the name and type of that declaration across every option vocabulary a
+  picker panel renders from.
 - That a panel holding an option with actions is a grid, how its rows are
   shaped, and when the panel switches.
 - How a pointer, a finger, a keyboard, and assistive technology reach an
@@ -162,40 +162,40 @@ Read from `packages/core/src` at this record's base commit.
 | `hooks/useMenuPress.ts`, `hooks/useTreeFocus.ts`, `Selector.tsx`, `TreeList.tsx` — `onActivate`                                                                                 | Core's own word for "the person fired this row or control", used by four modules. `OptionAction`'s handler takes that name (FR1).                                                                                                                                               |
 | `hooks/useGridFocus.ts` — `columns: number`, fixed; rows and columns computed over every cell in DOM order; `Calendar` consumes it                                              | The repository's grid model moves vertically by a fixed column count. Two cells per row, always, is the shape that model walks without a counting pass (DEC-3).                                                                                                                 |
 | `Selector.tsx` — Tab from the search input reaches the clear control inside the popover "keeping the popup open"                                                                | The only sequential stop inside a picker panel today, and it is the component's own. Actions add none (FR5, AR3).                                                                                                                                                               |
-| `SideNav/SideNavItem.tsx` — `actions?: ReactNode`; `Item.endContent` doc: "action buttons"                                                                                      | Rows already take their controls as nodes, so `actions` holding nodes is the shipped convention; `SideNavItem`'s is a single slot where this record's is one node per control.                                                                                                  |
+| `SideNav/SideNavItem.tsx` — `actions?: ReactNode`                                                                                                                               | The one shipped prop named `actions` holds a slot, not data. Here `actions` is declared data: a slot's node cannot tell the host whether it is disabled or dangerous (DEC-1).                                                                                                   |
 
 ## Public API and concepts
 
-| Concept                        | Closed values or states                                                                                                                        | Meaning                                                                                                                                                                                                                                                                                       | Default | Owner          | Stability |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------- | --------- |
-| `SelectorOptionData.actions`   | `ReactNode[] \| undefined`                                                                                                                     | The option's secondary controls, one node per control, in `Selector` and `MultiSelector`. Absent and `[]` mean the same: none.                                                                                                                                                                | absent  | `spec:AST-058` | proposed  |
-| `SearchableItem.actions`       | `ReactNode[] \| undefined`                                                                                                                     | The same key with the same type on the typeahead family's item, reaching `Typeahead` and `Tokenizer` through `BaseTypeahead`.                                                                                                                                                                 | absent  | `spec:AST-058` | proposed  |
-| `OptionAction`                 | component: `{label: string; icon?: ReactNode; onActivate: () => void; isDisabled?: boolean; variant?: 'neutral' \| 'accent' \| 'destructive'}` | The shipped control for an actions entry: the system owns its size, presentation, and accessible name (`label`); the caller owns the verb. Default `variant` is `neutral`. A sibling of the swipe-action control `spec:AST-057` ships, sharing its handler name and variant vocabulary (OQ1). | —       | `spec:AST-058` | proposed  |
-| the panel's role               | `listbox` → `grid`                                                                                                                             | A listbox until a declared option carries an entry; a grid from then on while the component stays mounted (FR2, DEC-5). Advertised through `aria-haspopup`.                                                                                                                                   | listbox | `spec:AST-058` | proposed  |
-| a row                          | `row` with exactly two `gridcell`s                                                                                                             | The option — everything it renders today — then its actions. System-minted rows have an empty actions cell.                                                                                                                                                                                   | —       | `spec:AST-058` | proposed  |
-| reaching an action             | pointer, touch, inline-end arrow + Enter, screen reader through `aria-activedescendant`                                                        | Every supported modality; never hover, swipe, or Tab alone.                                                                                                                                                                                                                                   | —       | `spec:AST-058` | proposed  |
-| more than one action in a cell | permitted by the key; development warning until a later record                                                                                 | FR10; OQ2.                                                                                                                                                                                                                                                                                    | —       | `spec:AST-058` | proposed  |
+| Concept                        | Closed values or states                                                                                                             | Meaning                                                                                                                                                                                                                                                                               | Default | Owner          | Stability |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | -------------- | --------- |
+| `OptionAction`                 | `{label: string; icon?: ReactNode; onActivate: () => void; isDisabled?: boolean; variant?: 'neutral' \| 'accent' \| 'destructive'}` | One secondary control beside an option, in `DropdownMenuItemData`'s field vocabulary with core's handler name. `label` is always the control's accessible name; `variant` defaults to `neutral`. Exported once as a type; shared with the swipe-action type or a sibling of it (OQ1). | —       | `spec:AST-058` | proposed  |
+| `SelectorOptionData.actions`   | `OptionAction[] \| undefined`                                                                                                       | The option's secondary controls, in `Selector` and `MultiSelector`. Absent and `[]` mean the same: none.                                                                                                                                                                              | absent  | `spec:AST-058` | proposed  |
+| `SearchableItem.actions`       | `OptionAction[] \| undefined`                                                                                                       | The same key with the same type on the typeahead family's item, reaching `Typeahead` and `Tokenizer` through `BaseTypeahead`.                                                                                                                                                         | absent  | `spec:AST-058` | proposed  |
+| the panel's role               | `listbox` → `grid`                                                                                                                  | A listbox until a declared option carries an action; a grid from then on while the component stays mounted (FR2, DEC-5). Advertised through `aria-haspopup`.                                                                                                                          | listbox | `spec:AST-058` | proposed  |
+| a row                          | `row` with exactly two `gridcell`s                                                                                                  | The option — everything it renders today — then its actions. System-minted rows have an empty actions cell.                                                                                                                                                                           | —       | `spec:AST-058` | proposed  |
+| reaching an action             | pointer, touch, inline-end arrow + Enter, screen reader through `aria-activedescendant`                                             | Every supported modality; never hover, swipe, or Tab alone.                                                                                                                                                                                                                           | —       | `spec:AST-058` | proposed  |
+| more than one action in a cell | permitted by the type; development warning until a later record                                                                     | FR10; OQ2.                                                                                                                                                                                                                                                                            | —       | `spec:AST-058` | proposed  |
 
 Not public: the row and cell markup, how the active descendant is tracked,
-how the actions column is sized, which hook walks the grid, and
-`OptionAction`'s own anatomy.
+how the actions column is sized, which hook walks the grid, and the control
+element the host renders for an action.
 
 ## Requirements
 
 ### Behavioral contract
 
-| ID   | Invariant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Basis                                                                                   | Verification state                                   |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| FR1  | An option carries its secondary controls as `actions?: ReactNode[]`, one entry per control. The key has the same name and the same type on `SelectorOptionData` and on `SearchableItem`. Astryx ships `OptionAction`, one exported component reachable from the package entry point and from each adopting component's subpath, taking `label` (a string, the control's accessible name), `icon?: ReactNode`, `onActivate`, `isDisabled?`, and `variant?: 'neutral' \| 'accent' \| 'destructive'` (default `neutral`). The host renders each entry as given; it MUST NOT inspect, clone, or wrap an entry's children to decide anything. | DEC-1, DEC-4; `useMenuPress.onActivate`; `architecture:public-component-api` INV1, INV2 | Proposed; no evidence on `main`                      |
-| FR2  | A panel is a listbox until a render in which any declared option — at any depth of sections, before any query filters it — carries at least one action; from that render it is a grid and stays a grid while the component is mounted. The absence of the key and an empty array are the same state and switch nothing. The control that owns the popup advertises the role in force through `aria-haspopup` (`grid`; the bottom sheet keeps `dialog`). A panel whose role followed the filtered view, or switched back, is a defect.                                                                                                    | DEC-2, DEC-5; `spec:AST-002` FR8, FR15                                                  | Proposed                                             |
-| FR3  | In a grid, each option is one `role="row"` carrying the option's id, `aria-selected`, and `aria-disabled`, with exactly two `gridcell` children for every row: the first holds everything the option renders today — selection mark or checkbox, icon, label, description, `renderOption` output — and the second holds its actions, empty when it declares none. Rows the component mints (select-all, a create row) are rows of the same shape with an empty actions cell. No row has one cell or three.                                                                                                                               | DEC-2, DEC-3; `useGridFocus` fixed columns                                              | Proposed                                             |
-| FR4  | Activating an `OptionAction` calls its `onActivate` and nothing else: the selection does not change, the highlighted row does not change on its account, and the panel neither closes nor re-filters. Pressing the option cell selects or toggles exactly as it does today. An option's `disabled` governs its selection only; an action is disabled only by its own `isDisabled`, and a disabled action calls nothing.                                                                                                                                                                                                                  | `spec:AST-002` FR16, DEC-6; the user need in #6828                                      | Proposed                                             |
-| FR5  | Up and Down move the highlight between rows as today, landing on the option cell; the inline-end arrow moves it from the option cell to the row's actions cell, and the inline-start arrow moves it back, so the keys follow visual direction under RTL. Enter or Space on the option cell selects as today; Enter or Space on the actions cell activates its action. Typing to jump, Home, End, PageUp, PageDown, Escape and Tab keep their current meanings. No action control is in the sequential tab order.                                                                                                                         | APG combobox with grid popup; `useGridFocus` RTL handling; `component:Selector` keys    | Proposed                                             |
-| FR6  | `aria-activedescendant` on the element that holds focus — the trigger, the search input, or the bottom-sheet panel — references the row while the highlight is on the option cell, and the action's control while it is on the actions cell. It never references an element the person cannot act on.                                                                                                                                                                                                                                                                                                                                    | AR3; current `aria-activedescendant` wiring in all three hosts                          | Proposed                                             |
-| FR7  | In a grid, a section is a `rowgroup` named by its title, with its heading hidden as today. Dividers and the "nothing matched" message stay out of the accessibility tree, as `Selector` and `MultiSelector` already keep them; `BaseTypeahead`'s message, an `option` today, becomes presentational in every mode and is announced as `spec:AST-056` AR1 requires. The popover and the bottom sheet render the same tree.                                                                                                                                                                                                                | ARIA grid required owned elements; `spec:AST-056` AR1                                   | Proposed; the `BaseTypeahead` message diverges today |
-| FR8  | An action is visible at rest on every input and every pointer type. `OptionAction` with `icon` shows the icon and takes `label` as its accessible name; without, it shows `label` as text. `variant` paints `neutral` in the row's text colour, `accent` in the accent colour, `destructive` in the error colour the menu row uses. Nothing is revealed on hover, focus, or swipe.                                                                                                                                                                                                                                                       | `architecture:interaction-modality` INV4; `spec:AST-057` DEC-5                          | Proposed; real-Chromium evidence required            |
-| FR9  | `Selector`, `MultiSelector`, `Typeahead`, and `Tokenizer` adopt this contract; the last two through the one panel `BaseTypeahead` renders. A host that renders either option vocabulary in a listbox it owns and has not adopted MUST NOT render the action inside the option; until it adopts, it renders the option without the action and warns in development when an item carries one.                                                                                                                                                                                                                                              | DEC-4; `spec:AST-002` FR15 (never silently render a broken state)                       | Proposed                                             |
-| FR10 | The key admits several entries on one option. Until a record settles how the highlight moves among several controls inside one cell, a row carrying more than one entry MUST warn in development, and a host MUST make at least the first reachable under FR5. The cardinality of the key does not change when that record lands. A caller's own node in an entry is reached the same way as an `OptionAction`; the cell is the host's, and the host moves to cells, not into them.                                                                                                                                                      | Non-goals; OQ2; `spec:AST-002` FR15                                                     | Proposed                                             |
+| ID   | Invariant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Basis                                                                                                         | Verification state                                   |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| FR1  | An option declares its secondary controls as `actions?: OptionAction[]`. The key has the same name and the same type on `SelectorOptionData` and on `SearchableItem`, and `OptionAction` is one exported type reachable from the package entry point and from each adopting component's subpath. `OptionAction` carries `DropdownMenuItemData`'s field names and meanings with core's handler name: `label` (a string, the control's accessible name), `icon?: ReactNode`, `onActivate`, `isDisabled?`, and `variant?: 'neutral' \| 'accent' \| 'destructive'` (default `neutral`). It MUST NOT carry a node the host renders as the control; `icon` is the one node it carries, and the host renders it without inspecting it. | DEC-1, DEC-4; `DropdownMenu.items`; `useMenuPress.onActivate`; `architecture:public-component-api` INV1, INV2 | Proposed; no evidence on `main`                      |
+| FR2  | A panel is a listbox until a render in which any declared option — at any depth of sections, before any query filters it — carries at least one action; from that render it is a grid and stays a grid while the component is mounted. The absence of the key and an empty array are the same state and switch nothing. The control that owns the popup advertises the role in force through `aria-haspopup` (`grid`; the bottom sheet keeps `dialog`). A panel whose role followed the filtered view, or switched back, is a defect.                                                                                                                                                                                           | DEC-2, DEC-5; `spec:AST-002` FR8, FR15                                                                        | Proposed                                             |
+| FR3  | In a grid, each option is one `role="row"` carrying the option's id, `aria-selected`, and `aria-disabled`, with exactly two `gridcell` children for every row: the first holds everything the option renders today — selection mark or checkbox, icon, label, description, `renderOption` output — and the second holds its actions, empty when it declares none. Rows the component mints (select-all, a create row) are rows of the same shape with an empty actions cell. No row has one cell or three.                                                                                                                                                                                                                      | DEC-2, DEC-3; `useGridFocus` fixed columns                                                                    | Proposed                                             |
+| FR4  | Activating an `OptionAction` calls its `onActivate` and nothing else: the selection does not change, the highlighted row does not change on its account, and the panel neither closes nor re-filters. Pressing the option cell selects or toggles exactly as it does today. An option's `disabled` governs its selection only; an action is disabled only by its own `isDisabled`, and a disabled action calls nothing.                                                                                                                                                                                                                                                                                                         | `spec:AST-002` FR16, DEC-6; the user need in #6828                                                            | Proposed                                             |
+| FR5  | Up and Down move the highlight between rows as today, landing on the option cell; the inline-end arrow moves it from the option cell to the row's actions cell, and the inline-start arrow moves it back, so the keys follow visual direction under RTL. Enter or Space on the option cell selects as today; Enter or Space on the actions cell activates its action. Typing to jump, Home, End, PageUp, PageDown, Escape and Tab keep their current meanings. No action control is in the sequential tab order.                                                                                                                                                                                                                | APG combobox with grid popup; `useGridFocus` RTL handling; `component:Selector` keys                          | Proposed                                             |
+| FR6  | `aria-activedescendant` on the element that holds focus — the trigger, the search input, or the bottom-sheet panel — references the row while the highlight is on the option cell, and the action's control while it is on the actions cell. It never references an element the person cannot act on.                                                                                                                                                                                                                                                                                                                                                                                                                           | AR3; current `aria-activedescendant` wiring in all three hosts                                                | Proposed                                             |
+| FR7  | In a grid, a section is a `rowgroup` named by its title, with its heading hidden as today. Dividers and the "nothing matched" message stay out of the accessibility tree, as `Selector` and `MultiSelector` already keep them; `BaseTypeahead`'s message, an `option` today, becomes presentational in every mode and is announced as `spec:AST-056` AR1 requires. The popover and the bottom sheet render the same tree.                                                                                                                                                                                                                                                                                                       | ARIA grid required owned elements; `spec:AST-056` AR1                                                         | Proposed; the `BaseTypeahead` message diverges today |
+| FR8  | An action is visible at rest on every input and every pointer type. With `icon`, the control shows the icon and takes `label` as its accessible name; without, it shows `label` as text. `variant` paints `neutral` in the row's text colour, `accent` in the accent colour, `destructive` in the error colour the menu row uses. Nothing is revealed on hover, focus, or swipe.                                                                                                                                                                                                                                                                                                                                                | `architecture:interaction-modality` INV4; `spec:AST-057` DEC-5                                                | Proposed; real-Chromium evidence required            |
+| FR9  | `Selector`, `MultiSelector`, `Typeahead`, and `Tokenizer` adopt this contract; the last two through the one panel `BaseTypeahead` renders. A host that renders either option vocabulary in a listbox it owns and has not adopted MUST NOT render the action inside the option; until it adopts, it renders the option without the action and warns in development when an item carries one.                                                                                                                                                                                                                                                                                                                                     | DEC-4; `spec:AST-002` FR15 (never silently render a broken state)                                             | Proposed                                             |
+| FR10 | The type admits several actions on one option. Until a record settles how the highlight moves among several controls inside one cell, a row declaring more than one action MUST warn in development, and a host MUST make at least the first reachable under FR5. The cardinality of the type does not change when that record lands.                                                                                                                                                                                                                                                                                                                                                                                           | Non-goals; OQ2; `spec:AST-002` FR15                                                                           | Proposed                                             |
 
 ### Accessibility contract
 
@@ -235,8 +235,8 @@ how the actions column is sized, which hook walks the grid, and
 
 ## Current-state impact
 
-- `SelectorOptionData` and `SearchableItem` gain `actions?: ReactNode[]`;
-  `OptionAction` is a new exported component. Additive: no shipped prop, default,
+- `SelectorOptionData` and `SearchableItem` gain `actions?: OptionAction[]`;
+  `OptionAction` is a new exported type. Additive: no shipped prop, default,
   or behavior changes for a caller who declares none. A caller who extends
   `SearchableItem` and already declares a member named `actions` of another
   type meets a type conflict on upgrade; the adoption change names that in
@@ -256,15 +256,17 @@ how the actions column is sized, which hook walks the grid, and
   `deciding_specs` when this record becomes `current`; no invariant changes.
 - `architecture:interaction-modality` is read, not changed; AR3 applies its
   INV4 and INV7.
-- `spec:AST-057` is coordinated, not changed: the two shipped controls share
-  `onActivate` and the `neutral | accent | destructive` vocabulary, with
-  different defaults (`neutral` here, where an Edit button sits on the panel's
-  own background; `accent` there, where a swipe panel must be some colour).
+- `spec:AST-057` is coordinated, not changed: the two action types share
+  `label`, `icon`, `onActivate`, `isDisabled`, and the
+  `neutral | accent | destructive` vocabulary, with different defaults
+  (`neutral` here, where an Edit button sits on the panel's own background;
+  `accent` there, where a swipe panel must be some colour). Whether they are
+  one type is OQ1.
   Its `reveal` guard names `listbox`, `menu`, and `radiogroup`; whether a grid
   selection host joins that list is that record's question.
 - `contributing:api-conventions` gains one sentence: a secondary control on a
-  data-declared row is a node on the row's own data, filled by a shipped
-  control the system owns, never a render prop on the host.
+  data-declared row is declared as data in the menu-row vocabulary with
+  `onActivate` as its handler, never as a slot or a render prop on the host.
 - Consumer docs for the five adopters gain the key and one example each.
 - No shipped public API changes on this record's own merge. While this record
   is `draft` its `review-applicability:v1` block routes nothing
@@ -272,17 +274,17 @@ how the actions column is sized, which hook walks the grid, and
 
 ## Verification
 
-| Contract      | Verification                                                                                        | Representative states                                                                                                                                                          | Mutation or failure expectation                                                                                                                                                                                 |
-| ------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| FR1, FR9      | Exported-surface checks and per-adopter prop-surface suites                                         | `OptionAction` imported from the entry point and each subpath; `actions` on both vocabularies; a caller's own node in an entry; a non-adopting host given an item with actions | A prop diverging from the menu-row vocabulary, a handler not named `onActivate`, a host inspecting an entry's children, a missing export, or a non-adopting host rendering the control inside an option, fails. |
-| FR2, DEC-5    | Per-adopter role suites across re-renders                                                           | No key; `actions: []`; one option with an action inside a section; a query that filters that option out; the actions removed on a later render                                 | A grid with no declared action, a listbox with one, a role that follows the filtered view, a switch back to listbox, or a stale `aria-haspopup`, fails.                                                         |
-| FR3, AR1      | Tree assertions plus required-children and required-parent checks in both modes                     | Plain options; sections; dividers; the empty state; select-all; a create row; a row without actions beside one with                                                            | A row with other than two cells, an `option` inside a grid, a `group` inside a grid, or a `none`/`presentation` wrapper carrying a control, fails.                                                              |
-| FR4           | Per-adopter interaction suites                                                                      | Click the action; click the option cell; a disabled action; a disabled option with an enabled action; single and multiple selection                                            | A selection change, a highlight change, a panel close, or a re-filter attributable to the action, or an action silenced by the option's `disabled`, fails.                                                      |
-| FR5, FR6, AR3 | Per-adopter keyboard suites with `aria-activedescendant` assertions; RTL via the direction provider | Down to a row; inline-end to its action; Enter; inline-start back; Escape; Tab; typing to jump; the same in RTL; bottom-sheet presentation                                     | A sequential tab stop inside the panel, an action unreachable by arrow, Enter on the actions cell selecting the option, or an active descendant on an inert element, fails.                                     |
-| FR7           | Per-adopter tree and live-region suites                                                             | Sections with and without titles; dividers while searching; the empty state in each host                                                                                       | A `group` in a grid, a divider or message exposed as a child, or a `BaseTypeahead` message still exposed as an `option`, fails.                                                                                 |
-| FR8           | Real-Chromium evidence at rest, hover, focus, and in RTL                                            | Icon action; text action; each `variant`; a row with and without an action; coarse and fine pointer                                                                            | An action absent at rest, revealed on hover, misaligned with its row, or a `variant` painted in the wrong colour, fails.                                                                                        |
-| FR10          | Development-warning suites                                                                          | One entry; two entries on one option; a caller's own node as the only entry                                                                                                    | A missing warning for two, or a first entry unreachable, fails.                                                                                                                                                 |
-| AR2, AR4      | Accessible-name and selection assertions                                                            | A row with an action; the partially selected select-all row; toggling in multiple selection                                                                                    | A row named by its action's label, a select-all row that loses its name, or a changed selection announcement, fails.                                                                                            |
+| Contract      | Verification                                                                                        | Representative states                                                                                                                                         | Mutation or failure expectation                                                                                                                                                                                           |
+| ------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR1, FR9      | Exported-type checks and per-adopter prop-surface suites                                            | `OptionAction` imported from the entry point and each subpath; `actions` on both vocabularies; an `icon` node; a non-adopting host given an item with actions | A field diverging from the menu-row vocabulary, a handler not named `onActivate`, a node-typed control, a host inspecting `icon`, a missing export, or a non-adopting host rendering the control inside an option, fails. |
+| FR2, DEC-5    | Per-adopter role suites across re-renders                                                           | No key; `actions: []`; one option with an action inside a section; a query that filters that option out; the actions removed on a later render                | A grid with no declared action, a listbox with one, a role that follows the filtered view, a switch back to listbox, or a stale `aria-haspopup`, fails.                                                                   |
+| FR3, AR1      | Tree assertions plus required-children and required-parent checks in both modes                     | Plain options; sections; dividers; the empty state; select-all; a create row; a row without actions beside one with                                           | A row with other than two cells, an `option` inside a grid, a `group` inside a grid, or a `none`/`presentation` wrapper carrying a control, fails.                                                                        |
+| FR4           | Per-adopter interaction suites                                                                      | Click the action; click the option cell; a disabled action; a disabled option with an enabled action; single and multiple selection                           | A selection change, a highlight change, a panel close, or a re-filter attributable to the action, or an action silenced by the option's `disabled`, fails.                                                                |
+| FR5, FR6, AR3 | Per-adopter keyboard suites with `aria-activedescendant` assertions; RTL via the direction provider | Down to a row; inline-end to its action; Enter; inline-start back; Escape; Tab; typing to jump; the same in RTL; bottom-sheet presentation                    | A sequential tab stop inside the panel, an action unreachable by arrow, Enter on the actions cell selecting the option, or an active descendant on an inert element, fails.                                               |
+| FR7           | Per-adopter tree and live-region suites                                                             | Sections with and without titles; dividers while searching; the empty state in each host                                                                      | A `group` in a grid, a divider or message exposed as a child, or a `BaseTypeahead` message still exposed as an `option`, fails.                                                                                           |
+| FR8           | Real-Chromium evidence at rest, hover, focus, and in RTL                                            | Icon action; text action; each `variant`; a row with and without an action; coarse and fine pointer                                                           | An action absent at rest, revealed on hover, misaligned with its row, or a `variant` painted in the wrong colour, fails.                                                                                                  |
+| FR10          | Development-warning suites                                                                          | One action; two actions on one option                                                                                                                         | A missing warning for two, or a first action unreachable, fails.                                                                                                                                                          |
+| AR2, AR4      | Accessible-name and selection assertions                                                            | A row with an action; the partially selected select-all row; toggling in multiple selection                                                                   | A row named by its action's label, a select-all row that loses its name, or a changed selection announcement, fails.                                                                                                      |
 
 Known verification gap: none of the suites above exist on `main`; no
 component implements the contract; the repository's accessibility pattern
@@ -295,52 +297,51 @@ DEC-1 and DEC-5 record the owner's direction of 2026-10-02; the others are
 **proposed**. `approved_by` is `null` and the record is `draft` until the
 owner approves it as a whole.
 
-### DEC-1 — Actions are nodes on the option, and the system ships the control that goes in them
+### DEC-1 — The declaration is data on the option
 
 **Reference:** `spec:AST-058/DEC-1`
 **Decider:** `cixzhang`, `2026-10-02` (direction; record pending)
 
-`actions?: ReactNode[]` on the option, one entry per control, and a shipped
-`OptionAction` component — `label`, `icon?`, `onActivate`, `isDisabled?`,
-`variant?: 'neutral' | 'accent' | 'destructive'` — that fills it in the
-common case.
+`actions?: OptionAction[]` on the option, in the vocabulary `MoreMenu.items`
+already speaks and with core's handler name: `{label, icon?, onActivate,
+isDisabled?, variant?: 'neutral' | 'accent' | 'destructive'}`.
 
 ```tsx
 options={[
   {
     value: 'eng',
     label: 'Engineering',
-    actions: [
-      <OptionAction icon={<PencilIcon />} label="Edit Engineering" onActivate={edit} />,
-    ],
+    actions: [{label: 'Edit', icon: <PencilIcon />, onActivate: edit}],
   },
   {value: 'design', label: 'Design'},
 ]}
 ```
 
-The option is where the information lives. Which rows have a control and how
-many are facts about that option, so a host reads `actions?.length` before it
-renders anything and decides its own structure (DEC-2) without calling
-anything; a row with no actions needs no code from the caller; an array
-carries two verbs as easily as one. The entries are nodes rather than
-declared data so that a caller who needs something the shipped control does
-not do passes their own node and is unblocked, while `OptionAction` keeps what
-the system should own: the control's size and presentation on the panel, its
-accessible name, and its `variant`. `onActivate` is core's own word for a
-fired row or control; the three variants are three flavours of verb —
-ordinary, the one you mean, the dangerous one — not a status set, because a
-verb is not a state.
+The option is where the information lives. Which rows have a control, how
+many, what each is called, whether it is disabled, and how dangerous it is
+are facts about that option, and a host reads them before it renders
+anything — so it decides its own structure (DEC-2) without calling anything,
+paints and names the control itself, and a row with no actions needs no code
+from the caller. An array carries two verbs as easily as one. A shape test of
+four candidate shapes with isolated builders, given the behavior and no prop
+names, reached exactly this shape on every recall probe and rejected a render
+prop unprompted; the report is held by the owner outside the repository.
 
-A shape test with isolated builders, given the behavior and no prop names,
-reached an array of `{label, icon, onClick}` on every recall probe; that is
-reconciled, not overridden — builders reached for an array because they were
-choosing from a vocabulary, and a shipped component is that vocabulary
-spelled as JSX. The report is held by the owner outside the repository.
+`onActivate` is core's own word for a fired row or control. The three
+variants are three flavours of verb — ordinary, the one you mean, the
+dangerous one — and `neutral` is the default because an Edit button beside
+an option sits on the panel's own background and should not shout.
 
 Rejected: a render prop on the host (`renderOptionAction`, #6828) — a host
 cannot tell "no actions anywhere" from "a function returning `null` for
 every row" without calling it for every row, so it cannot know its own
-structure, and the caller ends up guarding it. Rejected: one action per
+structure, and the caller ends up guarding it. Rejected: `actions` as an
+array of nodes with a shipped control to fill it — a caller's own node
+cannot declare `isDisabled` or `variant` without registering with the host,
+so the host could not reason about an action it was given, and the API would
+split into shipped controls that get behavior and arbitrary nodes that
+silently do not. A renderer for callers who outgrow the declared shape is a
+deliberate later extension, not a gap in this one. Rejected: one action per
 option — asked for two, a builder hand-rolls a second surface rather than
 invent an array. Rejected: `variant` as the status set
 `success | warning | error` — those name states, and an Edit button is not a
@@ -381,10 +382,9 @@ A grid is walked by a fixed column count — the repository's own grid hook
 moves vertically by exactly `columns` cells and computes rows over every
 cell in DOM order — so ragged rows break vertical movement. Two cells always
 means no counting pass, no per-row geometry, and no difference between a
-plain option, a select-all row, and a create row. A node in the second cell changes none of this: the cell is the host's, the
-node goes inside it, and the grid is walked to cells, never into them.
-Movement among several controls inside the second cell is the one piece this
-leaves open (FR10, OQ2).
+plain option, a select-all row, and a create row. The grid is walked to cells, never into them, so what the host renders
+inside the second cell changes none of this. Movement among several controls
+inside the second cell is the one piece this leaves open (FR10, OQ2).
 
 Rejected: one cell per action — row widths vary with the data and vertical
 movement lands in the wrong column.
@@ -405,7 +405,7 @@ So the same key, with the same name and the same type, is declared on both,
 and `OptionAction` is exported once. One concept keeps one name across the
 components that have it — the rule `spec:AST-056` FR1 applies to a state,
 applied here to a declaration. `SearchableItem` already carries render-time
-nodes from a source (`element?`), so a source attaching action nodes to its
+content from a source (`element?`), so a source attaching actions to its
 items is in character; `createStaticSource` passes them through untouched.
 `BaseTypeahead` is the single renderer, so adopting it once covers
 `Typeahead` and `Tokenizer`.
@@ -427,7 +427,7 @@ whose rows arrive asynchronously.
 
 A host decides its role from the options it was given, before any query
 filters them: any option, at any depth of sections, with a non-empty
-`actions` array. It reads the array's length, never its entries. An absent key and an empty array are one state — a caller
+`actions` array. An absent key and an empty array are one state — a caller
 who maps `actions: edits.filter(…)` for every option gets `[]` on most rows,
 and that must not make a grid.
 
@@ -445,27 +445,26 @@ changes role as a caller filters would be worse than either mode.
 
 ## Open questions
 
-- **OQ1 — Is `OptionAction` its own component, or the swipe-action control `spec:AST-057` ships?** (`human-api`)
+- **OQ1 — Are `OptionAction` and the swipe-action type in `spec:AST-057` one shared type, or two?** (`human-api`)
 
-  Both take `label`, `icon`, `onActivate`, `isDisabled`, and the same three
-  `variant` values. They differ in paint and default: a swipe panel is a
-  filled surface the system paints and animates, defaulting to `accent`
-  because it must be some colour; a picker-row action is a small control on
-  the panel's own background, defaulting to `neutral` because an Edit button
-  should not shout. Options: (a) two sibling components with one shared
-  vocabulary, each owning its paint and default; (b) one component with a
-  presentation axis, which puts a swipe panel's fill and a picker row's
-  control behind one name. The record is written for (a).
+  The fields are the same — `label`, `icon`, `onActivate`, `isDisabled`,
+  `variant: 'neutral' | 'accent' | 'destructive'` — apart from the swipe
+  type's own removal flag, which has no meaning for a picker option, and the
+  default `variant` (`neutral` here, `accent` there). Options: (a) one
+  exported type with the removal flag optional and each host documenting
+  which fields it reads and its own default; (b) two types with identical
+  core fields, each named for its host. The record is written for (a) and
+  the choice is to be made together with [#6908](https://github.com/facebook/astryx/pull/6908).
 
-- **OQ2 — How many entries may one cell hold before within-cell movement is specified?** (`human-api`)
+- **OQ2 — How many actions may one cell hold before within-cell movement is specified?** (`human-api`)
 
-  The key admits an array because two verbs were the case that defeated a
+  The type admits an array because two verbs were the case that defeated a
   single action. FR10 warns in development above one until a later record
   settles how the highlight walks several controls inside one cell. Options:
-  (a) keep FR10 as written — the key is final, the reach for the second
-  entry is owed; (b) settle the walk now, which widens this record into the
-  in-cell focus question the owner set aside; (c) narrow the key to one
-  entry and widen later, which the shape test argues against. The record is
+  (a) keep FR10 as written — the type is final, the reach for the second
+  action is owed; (b) settle the walk now, which widens this record into the
+  in-cell focus question the owner set aside; (c) narrow the type to one
+  action and widen later, which the shape test argues against. The record is
   written for (a).
 
 ## Content boundary
