@@ -96,7 +96,7 @@ const ARMS = {
       '      label={item.name}\n' +
       '      onClick={() => open(item.id)}\n' +
       '      actions={[\n' +
-      "        {label: 'Share', icon: <Icon name=\"share\" />, onAction: () => share(item.id)},\n" +
+      '        {label: \'Share\', icon: <Icon name="share" />, onAction: () => share(item.id)},\n' +
       '      ]}\n' +
       '    />\n' +
       '  ))}\n' +
@@ -112,7 +112,7 @@ const ARMS = {
       '`actions` is a slot for the secondary actions of the row: one control per\n' +
       'verb. `ListItemAction` (also exported from `@astryxdesign/core`) is the\n' +
       'control made for it and takes `label: string`,\n' +
-      '`icon?: ReactNode`, `onClick: () => void` and `tone?: \'accent\' | \'success\'\n' +
+      "`icon?: ReactNode`, `onClick: () => void` and `tone?: 'accent' | 'success'\n" +
       "| 'warning' | 'error'`; any other button or menu trigger works there too.\n\n" +
       REVEAL_PROSE,
     EXAMPLE_2:
@@ -138,7 +138,7 @@ const ARMS = {
       '| `swipeActions` | `{leading: SwipeAction; trailing?: SwipeAction}` | — |',
     PROP_PROSE:
       '`swipeActions` adds swipe actions for touch. Each `SwipeAction` is\n' +
-      '`{label: string, icon?: ReactNode, onAction: () => void, tone?: \'accent\' |\n' +
+      "`{label: string, icon?: ReactNode, onAction: () => void, tone?: 'accent' |\n" +
       "'success' | 'warning' | 'error'}`. Drag the row sideways to reveal a\n" +
       'labelled panel behind it; release past a third of the row, or fling, to fire\n' +
       'it and the row slides out; release short of that and the row springs back.\n' +
@@ -156,7 +156,7 @@ const ARMS = {
       '      label={item.name}\n' +
       '      onClick={() => open(item.id)}\n' +
       '      swipeActions={{\n' +
-      "        leading: {label: 'Share', icon: <Icon name=\"share\" />, onAction: () => share(item.id)},\n" +
+      '        leading: {label: \'Share\', icon: <Icon name="share" />, onAction: () => share(item.id)},\n' +
       '      }}\n' +
       '    />\n' +
       '  ))}\n' +

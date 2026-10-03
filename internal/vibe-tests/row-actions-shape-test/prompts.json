@@ -1,7 +1,12 @@
 {
   "name": "row-actions-shape",
   "description": "Vibe test comparing three API shapes for secondary actions on a list row: declared data, composed controls, and a touch-only commit swipe. Prompts are identical across arms and never name a prop, the word 'swipe', or the word 'hover'.",
-  "arms": ["arm-a-declared", "arm-b-composed", "arm-c-swipe-only", "arm-recall"],
+  "arms": [
+    "arm-a-declared",
+    "arm-b-composed",
+    "arm-c-swipe-only",
+    "arm-recall"
+  ],
   "prompts": [
     {
       "id": "p1",
