@@ -58,6 +58,27 @@ describe('Markdown', () => {
       );
     });
 
+    it('links every semantic heading level', () => {
+      render(
+        <Markdown>
+          {Array.from(
+            {length: 6},
+            (_, index) => `${'#'.repeat(index + 1)} Level ${index + 1}`,
+          ).join('\n\n')}
+        </Markdown>,
+      );
+      for (let level = 1; level <= 6; level += 1) {
+        const heading = screen.getByRole('heading', {
+          level,
+          name: `Level ${level}`,
+        });
+        expect(heading).toHaveAttribute('id', `level-${level}`);
+        expect(
+          screen.getByRole('link', {name: `Permalink to Level ${level}`}),
+        ).toHaveAttribute('href', `#level-${level}`);
+      }
+    });
+
     it('disambiguates duplicate headings with numeric suffixes', () => {
       render(<Markdown>{'# Setup\n\n# Setup\n\n# Setup'}</Markdown>);
       const ids = screen.getAllByText('Setup').map(el => el.id);
@@ -237,6 +258,25 @@ describe('Markdown', () => {
       expect(
         screen.getByRole('link', {name: 'Lien permanent vers Aperçu'}),
       ).toHaveAttribute('href', '#aperçu');
+    });
+
+    it('uses the generated id when heading text has no slug text', () => {
+      render(
+        <Markdown sources={{cite: {title: 'Citation'}}}>{'# [cite]'}</Markdown>,
+      );
+      expect(screen.getByRole('heading')).toHaveAttribute('id', 'section');
+      expect(
+        screen.getByRole('link', {name: 'Permalink to section'}),
+      ).toHaveAttribute('href', '#section');
+    });
+
+    it('keeps caller-controlled root ids inside a same-document fragment', () => {
+      const unsafeNamespace = ['java', 'script:alert(1)'].join('');
+      // eslint-disable-next-line @eslint-react/dom-no-script-url -- this is an id namespace; the rendered destination starts with #
+      render(<Markdown id={unsafeNamespace}>{'# Overview'}</Markdown>);
+      expect(
+        screen.getByRole('link', {name: 'Permalink to Overview'}),
+      ).toHaveAttribute('href', `#${unsafeNamespace}--overview`);
     });
 
     it('leaves permalink output to a custom heading renderer at every depth', () => {

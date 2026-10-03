@@ -196,12 +196,14 @@ function ControlledOutline() {
           code: `
 import {Outline, useOutlineFromMarkdown} from '@astryxdesign/core/Outline';
 
-function MarkdownOutline({markdown, plugins, isStreaming}) {
-  // Pass the same plugins and finality to Markdown and Outline so transformed
-  // headings share labels and ids while content streams.
+function MarkdownOutline({markdown, plugins, isStreaming, markdownRootId}) {
+  // Pass the same plugins, finality, and optional stable root-id namespace to
+  // Markdown and Outline. Nested headings consume the depth-first id sequence,
+  // while the returned outline continues to list root headings only.
   const items = useOutlineFromMarkdown(markdown, {
     plugins,
     isFinal: !isStreaming,
+    headingIdPrefix: markdownRootId,
   });
   return <Outline items={items} />;
 }
@@ -263,7 +265,7 @@ function FlashOnArrival() {
       {guidance: true, description: 'Pass a flat ordered list of headings and let level control indentation.'},
       {guidance: true, description: 'Use activeId when custom scroll logic owns the active section.'},
       {guidance: true, description: 'Use density="compact" in dense sidebars where vertical space is tight.'},
-      {guidance: true, description: 'Use useOutlineFromMarkdown or useOutlineFromDOM when headings are generated from content.'},
+      {guidance: true, description: 'Use useOutlineFromMarkdown or useOutlineFromDOM when headings are generated from content. For multiple Markdown roots, pass each stable root id as headingIdPrefix.'},
       {guidance: true, description: 'Pass scrollContainerRef when the content scrolls in a split pane, modal, or panel instead of the viewport.'},
       {guidance: true, description: 'Set offset to the height of a fixed header that overlays the content, so headings land below it instead of underneath it.'},
       {guidance: false, description: 'Use Outline for application navigation - use SideNav or TopNav for routes.'},
@@ -365,7 +367,7 @@ export const docsZh = {
       {guidance: true, description: 'Pass a flat ordered list of headings and let level control indentation.'},
       {guidance: true, description: 'Use activeId when custom scroll logic owns the active section.'},
       {guidance: true, description: 'Use density="compact" in dense sidebars where vertical space is tight.'},
-      {guidance: true, description: 'Use useOutlineFromMarkdown or useOutlineFromDOM when headings are generated from content.'},
+      {guidance: true, description: 'Use useOutlineFromMarkdown or useOutlineFromDOM when headings are generated from content. For multiple Markdown roots, pass each stable root id as headingIdPrefix.'},
       {guidance: false, description: 'Use Outline for application navigation - use SideNav or TopNav for routes.'},
       {guidance: false, description: 'Use Outline for expandable hierarchy - use TreeList when nodes need expand and collapse.'},
     ],
@@ -384,7 +386,7 @@ export const docsDense = {
       {guidance: true, description: 'Pass a flat ordered list of headings and let level control indentation.'},
       {guidance: true, description: 'Use activeId when custom scroll logic owns the active section.'},
       {guidance: true, description: 'Use density="compact" in dense sidebars where vertical space is tight.'},
-      {guidance: true, description: 'Use useOutlineFromMarkdown or useOutlineFromDOM when headings are generated from content.'},
+      {guidance: true, description: 'Use useOutlineFromMarkdown or useOutlineFromDOM when headings are generated from content. For multiple Markdown roots, pass each stable root id as headingIdPrefix.'},
       {guidance: true, description: 'Pass scrollContainerRef when the content scrolls in a split pane, modal, or panel instead of the viewport.'},
       {guidance: true, description: 'Set offset to the height of a fixed header that overlays the content, so headings land below it instead of underneath it.'},
       {guidance: false, description: 'Use Outline for application navigation - use SideNav or TopNav for routes.'},

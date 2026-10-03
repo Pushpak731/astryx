@@ -1,7 +1,9 @@
 // Copyright (c) Meta Platforms, Inc. and affiliates.
 
 import {describe, expect, it} from 'vitest';
+import {renderHook} from '@testing-library/react';
 import {parseOutlineFromMarkdown} from './parseOutlineFromMarkdown';
+import {useOutlineFromMarkdown} from './useOutlineFromMarkdown';
 
 describe('parseOutlineFromMarkdown', () => {
   it('returns an empty outline for content with no headings', () => {
@@ -79,6 +81,17 @@ describe('parseOutlineFromMarkdown', () => {
     expect(
       parseOutlineFromMarkdown('# Overview', {headingIdPrefix: 'article'}),
     ).toEqual([{id: 'article--overview', label: 'Overview', level: 1}]);
+  });
+
+  it('updates the hook result when only the heading namespace changes', () => {
+    const {result, rerender} = renderHook(
+      ({headingIdPrefix}: {headingIdPrefix: string}) =>
+        useOutlineFromMarkdown('# Overview', {headingIdPrefix}),
+      {initialProps: {headingIdPrefix: 'first'}},
+    );
+    expect(result.current[0].id).toBe('first--overview');
+    rerender({headingIdPrefix: 'second'});
+    expect(result.current[0].id).toBe('second--overview');
   });
 
   it('falls back to "section" when a heading slugifies to empty', () => {

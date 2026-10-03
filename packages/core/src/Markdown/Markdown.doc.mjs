@@ -11,7 +11,13 @@ const anatomy = [
     name: 'Heading',
     required: false,
     description:
-      'Rendered heading block; a custom heading renderer replaces the default part.',
+      'Rendered semantic heading block with a stable generated id; a custom heading renderer replaces the default part.',
+  },
+  {
+    name: 'Heading permalink',
+    required: false,
+    description:
+      'Native sibling fragment link rendered beside every default heading; custom heading renderers own their own permalink UI.',
   },
   {
     name: 'Paragraph',
@@ -198,6 +204,7 @@ export const docs = {
   theming: {
     targets: [
       {className: 'astryx-markdown', visualProps: ['density']},
+      {className: 'astryx-link'},
       {
         className: 'astryx-markdown-heading',
         visualProps: ['density', 'level'],
@@ -305,7 +312,12 @@ export const docs = {
       {
         guidance: true,
         description:
-          'Pair with Outline and useOutlineFromMarkdown for section navigation: headings render generated id attributes that match the outline item ids, so hash links scroll to their target.',
+          'Every default h1–h6 is a native direct-link target with a sibling permalink. Pair with Outline and useOutlineFromMarkdown for root-heading navigation; nested headings consume the same depth-first id sequence so every fragment stays unique.',
+      },
+      {
+        guidance: true,
+        description:
+          'When multiple Markdown documents share a page, give each Markdown root a stable id and pass that same value as headingIdPrefix to useOutlineFromMarkdown. Omit both to preserve the standard unprefixed fragments.',
       },
       {
         guidance: false,
@@ -658,6 +670,7 @@ export const docsZh = {
   theming: {
     targets: [
       {className: 'astryx-markdown', visualProps: ['density']},
+      {className: 'astryx-link'},
       {
         className: 'astryx-markdown-heading',
         visualProps: ['density', 'level'],
@@ -781,7 +794,12 @@ export const docsZh = {
       {
         guidance: true,
         description:
-          'Pair with Outline and useOutlineFromMarkdown for section navigation: headings render generated id attributes that match the outline item ids, so hash links scroll to their target.',
+          'Every default h1–h6 is a native direct-link target with a sibling permalink. Pair with Outline and useOutlineFromMarkdown for root-heading navigation; nested headings consume the same depth-first id sequence so every fragment stays unique.',
+      },
+      {
+        guidance: true,
+        description:
+          'When multiple Markdown documents share a page, give each Markdown root a stable id and pass that same value as headingIdPrefix to useOutlineFromMarkdown. Omit both to preserve the standard unprefixed fragments.',
       },
       {
         guidance: false,
@@ -868,7 +886,7 @@ export const docsDense = {
       {
         guidance: true,
         description:
-          'Headings render id attributes matching useOutlineFromMarkdown ids; pair with Outline for hash navigation.',
+          'Default h1–h6 render stable ids and native sibling permalinks. Markdown-derived Outline returns root headings but shares the depth-first allocator; use the Markdown root id as headingIdPrefix for multiple instances.',
       },
       {
         guidance: false,

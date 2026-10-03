@@ -184,6 +184,96 @@ export const Default: Story = {
   },
 };
 
+const HEADING_LINKS_MD = [
+  '# Linkable headings',
+  '',
+  'Copy or open the visible `#` permalink with native browser behavior.',
+  '',
+  '> ## Nested heading',
+  '',
+  '## Read the [guide](https://example.com/guide)',
+  '',
+  '## Ｈｅｌｌｏ Привет 你好 😄 １２３',
+  '',
+  '## Repeat',
+  '',
+  '## Repeat',
+  '',
+  '## Repeat-1',
+].join('\n');
+
+export const HeadingPermalinks: Story = {
+  name: 'Heading permalinks',
+  parameters: {
+    docs: {
+      description: {
+        story:
+          'Every default h1–h6 has a stable native sibling permalink. Nested headings share the depth-first allocator, authored heading links never nest anchors, Unicode ids remain readable, and a stable Markdown root id namespaces each instance.',
+      },
+    },
+  },
+  render: () => (
+    <>
+      <Markdown id="heading-links-ltr">{HEADING_LINKS_MD}</Markdown>
+      <section dir="rtl" aria-label="Right-to-left heading links">
+        <Markdown id="heading-links-rtl">
+          {'# عنوان قابل للربط\n\n## تفاصيل'}
+        </Markdown>
+      </section>
+    </>
+  ),
+  play: async ({canvasElement}) => {
+    const canvas = within(canvasElement);
+    const ltr = canvasElement.querySelector<HTMLElement>('#heading-links-ltr');
+    if (ltr == null) {
+      throw new Error('missing namespaced Markdown root');
+    }
+
+    const firstHeading = within(ltr).getByRole('heading', {
+      name: 'Linkable headings',
+    });
+    await expect(firstHeading).toHaveAttribute(
+      'id',
+      'heading-links-ltr--linkable-headings',
+    );
+    const firstPermalink = within(ltr).getByRole('link', {
+      name: 'Permalink to Linkable headings',
+    });
+    await expect(firstPermalink).toHaveAttribute(
+      'href',
+      '#heading-links-ltr--linkable-headings',
+    );
+    await expect(firstPermalink.parentElement).toContainElement(firstHeading);
+    await expect(firstHeading).not.toContainElement(firstPermalink);
+
+    await expect(
+      within(ltr).getByRole('heading', {name: 'Nested heading'}),
+    ).toHaveAttribute('id', 'heading-links-ltr--nested-heading');
+    await expect(
+      within(ltr).getByRole('heading', {name: 'Read the guide'}),
+    ).toContainElement(within(ltr).getByRole('link', {name: 'guide'}));
+    await expect(ltr.querySelector('a a')).toBeNull();
+    await expect(
+      within(ltr).getByRole('heading', {name: /Hello Привет 你好/}),
+    ).toHaveAttribute('id', 'heading-links-ltr--hello-привет-你好-123');
+    await expect(
+      Array.from(ltr.querySelectorAll('h1,h2'))
+        .slice(-3)
+        .map(node => node.id),
+    ).toEqual([
+      'heading-links-ltr--repeat',
+      'heading-links-ltr--repeat-1',
+      'heading-links-ltr--repeat-1-1',
+    ]);
+
+    await userEvent.tab();
+    await expect(firstPermalink).toHaveFocus();
+    await expect(
+      canvas.getByRole('link', {name: 'Permalink to عنوان قابل للربط'}),
+    ).toHaveAttribute('href', '#heading-links-rtl--عنوان-قابل-للربط');
+  },
+};
+
 export const Compact: Story = {
   args: {
     children: SAMPLE_MD,
