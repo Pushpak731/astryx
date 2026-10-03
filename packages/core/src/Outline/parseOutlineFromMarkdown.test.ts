@@ -4,6 +4,9 @@ import {describe, expect, it} from 'vitest';
 import {renderHook} from '@testing-library/react';
 import {parseOutlineFromMarkdown} from './parseOutlineFromMarkdown';
 import {useOutlineFromMarkdown} from './useOutlineFromMarkdown';
+import {createMarkdownHeadingLinks} from '../Markdown/plugins/headingLinks';
+
+const headingLinks = createMarkdownHeadingLinks();
 
 describe('parseOutlineFromMarkdown', () => {
   it('returns an empty outline for content with no headings', () => {
@@ -53,44 +56,50 @@ describe('parseOutlineFromMarkdown', () => {
 
   it('reserves emitted ids across natural and numeric-suffix collisions', () => {
     expect(
-      parseOutlineFromMarkdown(['# Foo', '# Foo', '# Foo-1'].join('\n\n')).map(
-        item => item.id,
-      ),
+      parseOutlineFromMarkdown(['# Foo', '# Foo', '# Foo-1'].join('\n\n'), {
+        plugins: [headingLinks],
+      }).map(item => item.id),
     ).toEqual(['foo', 'foo-1', 'foo-1-1']);
     expect(
-      parseOutlineFromMarkdown(['# Foo-1', '# Foo', '# Foo'].join('\n\n')).map(
-        item => item.id,
-      ),
+      parseOutlineFromMarkdown(['# Foo-1', '# Foo', '# Foo'].join('\n\n'), {
+        plugins: [headingLinks],
+      }).map(item => item.id),
     ).toEqual(['foo-1', 'foo', 'foo-2']);
   });
 
   it('uses NFKC Unicode letters and numbers in ids', () => {
     expect(
-      parseOutlineFromMarkdown('# Ｈｅｌｌｏ Привет 你好 😄 １２３')[0].id,
+      parseOutlineFromMarkdown('# Ｈｅｌｌｏ Привет 你好 😄 １２３', {
+        plugins: [headingLinks],
+      })[0].id,
     ).toBe('hello-привет-你好-123');
   });
 
   it('lets nested headings consume ids without adding them to the outline', () => {
     const source = '> # Quoted\n\n# Quoted';
-    expect(parseOutlineFromMarkdown(source)).toEqual([
-      {id: 'quoted-1', label: 'Quoted', level: 1},
-    ]);
+    expect(parseOutlineFromMarkdown(source, {plugins: [headingLinks]})).toEqual(
+      [{id: 'quoted-1', label: 'Quoted', level: 1}],
+    );
   });
 
-  it('prefixes ids with the Markdown root id when requested', () => {
+  it('prefixes ids through the shared heading-links plugin', () => {
+    const namespaced = createMarkdownHeadingLinks({
+      headingIdPrefix: 'article',
+    });
     expect(
-      parseOutlineFromMarkdown('# Overview', {headingIdPrefix: 'article'}),
+      parseOutlineFromMarkdown('# Overview', {plugins: [namespaced]}),
     ).toEqual([{id: 'article--overview', label: 'Overview', level: 1}]);
   });
 
-  it('updates the hook result when only the heading namespace changes', () => {
+  it('updates the hook result when the plugin namespace changes', () => {
+    const first = [createMarkdownHeadingLinks({headingIdPrefix: 'first'})];
+    const second = [createMarkdownHeadingLinks({headingIdPrefix: 'second'})];
     const {result, rerender} = renderHook(
-      ({headingIdPrefix}: {headingIdPrefix: string}) =>
-        useOutlineFromMarkdown('# Overview', {headingIdPrefix}),
-      {initialProps: {headingIdPrefix: 'first'}},
+      ({plugins}) => useOutlineFromMarkdown('# Overview', {plugins}),
+      {initialProps: {plugins: first}},
     );
     expect(result.current[0].id).toBe('first--overview');
-    rerender({headingIdPrefix: 'second'});
+    rerender({plugins: second});
     expect(result.current[0].id).toBe('second--overview');
   });
 

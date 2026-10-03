@@ -147,10 +147,10 @@ export interface MarkdownComponents {
     level: 1 | 2 | 3 | 4 | 5 | 6;
     children: React.ReactNode;
     /**
-     * Generated stable id for this heading, matching the shared depth-first
-     * allocator used by Markdown-derived Outline utilities. Every heading,
-     * including headings nested inside blockquotes or list items, receives one.
-     * Custom renderers own their output and should apply it to their heading.
+     * Generated stable id for this heading, matching Markdown-derived Outline.
+     * Released output supplies it to root headings; createMarkdownHeadingLinks()
+     * expands the shared allocator to headings nested in blockquotes and lists.
+     * Custom renderers own their output and should apply the id they receive.
      */
     id?: string;
   }>;
@@ -1367,6 +1367,7 @@ function renderBlock(
       );
       const headingId = headingProjection?.ids.get(node);
       const headingLabel = headingProjection?.labels.get(node) ?? '';
+      const permalinkHref = headingProjection?.permalinkHrefs.get(node);
       const HeadingComp = components?.heading;
       if (HeadingComp) {
         return (
@@ -1376,6 +1377,31 @@ function renderBlock(
         );
       }
       const Tag = `h${level}` as const;
+      if (permalinkHref == null) {
+        return (
+          <Tag
+            key={index}
+            id={headingId}
+            {...mergeProps(
+              themeProps('markdown-heading', {density, level}),
+              stylex.props(
+                styles.headingBase,
+                headingStyles[level],
+                spacing,
+                contentWidthValue != null
+                  ? dynamicStyles.proseWidth(contentWidthValue)
+                  : null,
+                contentAlign !== 'start'
+                  ? dynamicStyles.proseAlign(ALIGN_MARGIN[contentAlign])
+                  : null,
+                isFirst && styles.noMarginBlockStart,
+                isLast && styles.noMarginBlockEnd,
+              ),
+            )}>
+            {headingChildren}
+          </Tag>
+        );
+      }
       return (
         <div
           key={index}
@@ -1403,22 +1429,20 @@ function renderBlock(
             )}>
             {headingChildren}
           </Tag>
-          {headingId != null && (
-            <Link
-              as="a"
-              href={`#${headingId}`}
-              label={t('@astryx.markdown.headingPermalink', {
-                heading: headingLabel || headingId,
-              })}
-              type="inherit"
-              color="secondary"
-              {...stylex.props(
-                styles.headingPermalink,
-                styles.headingPermalinkHover,
-              )}>
-              #
-            </Link>
-          )}
+          <Link
+            as="a"
+            href={permalinkHref}
+            label={t('@astryx.markdown.headingPermalink', {
+              heading: headingLabel || headingId,
+            })}
+            type="inherit"
+            color="secondary"
+            {...stylex.props(
+              styles.headingPermalink,
+              styles.headingPermalinkHover,
+            )}>
+            #
+          </Link>
         </div>
       );
     }
@@ -2141,9 +2165,9 @@ export function Markdown<
     [parsedBlocks, preparedPlugins, transformSource, isStreaming],
   );
 
-  // One depth-first projection owns every rendered heading id and the root-only
-  // Outline subset. It stays above the inline early return because hooks cannot
-  // be conditional. A supplied Markdown root id is the stable namespace.
+  // One post-transform projection keeps Markdown and Markdown-derived Outline
+  // aligned. Released output projects root headings only; installing the
+  // heading-links plugin expands the same allocator to every rendered h1–h6.
   const headingProjection = useMemo(() => {
     if (display === 'inline' || blocks.length === 0) {
       return undefined;
@@ -2151,9 +2175,8 @@ export function Markdown<
     return projectMarkdownHeadings(
       {type: 'root', children: blocks},
       preparedPlugins,
-      rootId,
     );
-  }, [display, blocks, preparedPlugins, rootId]);
+  }, [display, blocks, preparedPlugins]);
 
   const parsedInlineNodes = useMemo(() => {
     if (display !== 'inline') {

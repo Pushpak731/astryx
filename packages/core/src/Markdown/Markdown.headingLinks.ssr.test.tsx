@@ -12,6 +12,14 @@ import {afterEach, describe, expect, it, vi} from 'vitest';
 import {hydrateRoot} from 'react-dom/client';
 import {renderToString} from 'react-dom/server';
 import {Markdown} from './Markdown';
+import {createMarkdownHeadingLinks} from './plugins/headingLinks';
+
+const articleAHeadingLinks = createMarkdownHeadingLinks({
+  headingIdPrefix: 'article-a',
+});
+const articleBHeadingLinks = createMarkdownHeadingLinks({
+  headingIdPrefix: 'article-b',
+});
 
 const SOURCE = '# Overview\n\n> ## Details';
 
@@ -23,8 +31,12 @@ describe('Markdown heading links — SSR', () => {
   it('keeps namespaced ids and hrefs stable across multiple instances and hydration', async () => {
     const tree = (
       <>
-        <Markdown id="article-a">{SOURCE}</Markdown>
-        <Markdown id="article-b">{SOURCE}</Markdown>
+        <Markdown id="article-a" plugins={[articleAHeadingLinks]}>
+          {SOURCE}
+        </Markdown>
+        <Markdown id="article-b" plugins={[articleBHeadingLinks]}>
+          {SOURCE}
+        </Markdown>
       </>
     );
     const serverHTML = renderToString(tree);

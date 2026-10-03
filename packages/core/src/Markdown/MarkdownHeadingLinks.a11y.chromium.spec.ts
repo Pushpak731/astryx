@@ -9,7 +9,7 @@
  * Build Storybook first:
  *
  *   pnpm storybook:build
- *   pnpm exec playwright test MarkdownHeadingLinks.chromium.spec.ts
+ *   pnpm exec playwright test MarkdownHeadingLinks.a11y.chromium.spec.ts
  */
 
 import * as fs from 'node:fs';
@@ -52,6 +52,9 @@ async function openStory(
     {waitUntil: 'load'},
   );
   await page.locator('#heading-links-ltr h1').waitFor({state: 'visible'});
+  await page
+    .locator('#heading-links-ltr[data-heading-links-play-complete="true"]')
+    .waitFor();
 }
 
 async function permalinkOpacity(page: Page): Promise<number> {
@@ -60,7 +63,7 @@ async function permalinkOpacity(page: Page): Promise<number> {
     .evaluate(element => Number(getComputedStyle(element).opacity));
 }
 
-test('default heading links stay native, discoverable, and stable in every required state', async ({
+test('opt-in heading links stay native, discoverable, and stable in every required state', async ({
   browser,
   page,
 }) => {

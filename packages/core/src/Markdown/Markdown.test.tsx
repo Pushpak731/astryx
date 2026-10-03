@@ -13,6 +13,7 @@ import {render, screen, fireEvent} from '@testing-library/react';
 import type {ComponentProps, ReactNode} from 'react';
 import * as stylex from '@stylexjs/stylex';
 import {Markdown} from './Markdown';
+import {createMarkdownHeadingLinks} from './plugins/headingLinks';
 import type {MarkdownComponents, MarkdownInlinePlugin} from './Markdown';
 import type {ParseOptions} from './index';
 import {stubMatchMedia} from '../__tests__/stubMatchMedia';
@@ -20,6 +21,8 @@ import {parseOutlineFromMarkdown} from '../Outline/parseOutlineFromMarkdown';
 import {LinkProvider} from '../Link/LinkProvider';
 import {InternationalizationProvider} from '../i18n';
 import {spacingVars} from '../theme/tokens.stylex';
+
+const headingLinks = createMarkdownHeadingLinks();
 
 const tableCellSpacingProbe = stylex.create({
   cell: {
@@ -60,7 +63,7 @@ describe('Markdown', () => {
 
     it('links every semantic heading level', () => {
       render(
-        <Markdown>
+        <Markdown plugins={[headingLinks]}>
           {Array.from(
             {length: 6},
             (_, index) => `${'#'.repeat(index + 1)} Level ${index + 1}`,
@@ -143,8 +146,12 @@ describe('Markdown', () => {
       // Nested headings are linkable too. They share one depth-first allocator
       // with root headings, while Outline keeps returning root headings only.
       const source = '> # Quoted\n\n# Quoted';
-      const {container} = render(<Markdown>{source}</Markdown>);
-      const outline = parseOutlineFromMarkdown(source);
+      const {container} = render(
+        <Markdown plugins={[headingLinks]}>{source}</Markdown>,
+      );
+      const outline = parseOutlineFromMarkdown(source, {
+        plugins: [headingLinks],
+      });
       expect(outline.map(i => i.id)).toEqual(['quoted-1']);
       const [nested, topLevel] = screen.getAllByText('Quoted');
       expect(container.querySelector('blockquote')).toContainElement(nested);
@@ -153,29 +160,46 @@ describe('Markdown', () => {
     });
 
     it('reserves every emitted id across authored suffix collisions', () => {
-      render(<Markdown>{'# Foo\n\n# Foo\n\n# Foo-1'}</Markdown>);
+      render(
+        <Markdown plugins={[headingLinks]}>
+          {'# Foo\n\n# Foo\n\n# Foo-1'}
+        </Markdown>,
+      );
       expect(screen.getAllByRole('heading').map(heading => heading.id)).toEqual(
         ['foo', 'foo-1', 'foo-1-1'],
       );
     });
 
     it('normalizes Unicode letters and numbers while stripping emoji', () => {
-      render(<Markdown>{'# Ｈｅｌｌｏ Привет 你好 😄 １２３'}</Markdown>);
+      render(
+        <Markdown plugins={[headingLinks]}>
+          {'# Ｈｅｌｌｏ Привет 你好 😄 １２３'}
+        </Markdown>,
+      );
       expect(screen.getByRole('heading')).toHaveAttribute(
         'id',
         'hello-привет-你好-123',
       );
     });
 
-    it('uses the Markdown root id as a stable heading namespace', () => {
+    it('uses the plugin namespace with the caller-owned Markdown root id', () => {
       const source = '# Overview\n\n## Details';
-      const {container} = render(<Markdown id="article">{source}</Markdown>);
+      const namespacedHeadingLinks = createMarkdownHeadingLinks({
+        headingIdPrefix: 'article',
+      });
+      const {container} = render(
+        <Markdown id="article" plugins={[namespacedHeadingLinks]}>
+          {source}
+        </Markdown>,
+      );
       expect(container.firstElementChild).toHaveAttribute('id', 'article');
       expect(screen.getAllByRole('heading').map(heading => heading.id)).toEqual(
         ['article--overview', 'article--details'],
       );
       expect(
-        parseOutlineFromMarkdown(source, {headingIdPrefix: 'article'}),
+        parseOutlineFromMarkdown(source, {
+          plugins: [namespacedHeadingLinks],
+        }),
       ).toEqual([
         {id: 'article--overview', label: 'Overview', level: 1},
         {id: 'article--details', label: 'Details', level: 2},
@@ -184,9 +208,25 @@ describe('Markdown', () => {
   });
 
   describe('heading permalinks', () => {
-    it('renders one native sibling permalink for every default heading', () => {
+    it('keeps heading links off unless the plugin is installed', () => {
+      render(
+        <Markdown id="article">{'# Overview\n\n> ## Nested details'}</Markdown>,
+      );
+      expect(screen.queryByRole('link', {name: /Permalink to/})).toBeNull();
+      expect(screen.getByRole('heading', {name: 'Overview'})).toHaveAttribute(
+        'id',
+        'overview',
+      );
+      expect(
+        screen.getByRole('heading', {name: 'Nested details'}),
+      ).not.toHaveAttribute('id');
+    });
+
+    it('renders one native sibling permalink for every plugin-owned heading', () => {
       const {container} = render(
-        <Markdown>{'# Overview\n\n> ## Nested details'}</Markdown>,
+        <Markdown plugins={[headingLinks]}>
+          {'# Overview\n\n> ## Nested details'}
+        </Markdown>,
       );
       const headings = screen.getAllByRole('heading');
       expect(headings.map(heading => heading.id)).toEqual([
@@ -211,7 +251,9 @@ describe('Markdown', () => {
 
     it('keeps authored heading links valid instead of nesting anchors', () => {
       const {container} = render(
-        <Markdown>{'# Read the [guide](https://example.com/guide)'}</Markdown>,
+        <Markdown plugins={[headingLinks]}>
+          {'# Read the [guide](https://example.com/guide)'}
+        </Markdown>,
       );
       const heading = screen.getByRole('heading', {name: 'Read the guide'});
       expect(heading.querySelectorAll('a')).toHaveLength(1);
@@ -230,7 +272,9 @@ describe('Markdown', () => {
       );
       render(
         <LinkProvider component={ProviderLink}>
-          <Markdown onLinkClick={onLinkClick}>{'# Overview'}</Markdown>
+          <Markdown onLinkClick={onLinkClick} plugins={[headingLinks]}>
+            {'# Overview'}
+          </Markdown>
         </LinkProvider>,
       );
       const permalink = screen.getByRole('link', {
@@ -252,7 +296,7 @@ describe('Markdown', () => {
                 'Lien permanent vers {heading}',
             },
           }}>
-          <Markdown>{'# Aperçu'}</Markdown>
+          <Markdown plugins={[headingLinks]}>{'# Aperçu'}</Markdown>
         </InternationalizationProvider>,
       );
       expect(
@@ -262,7 +306,11 @@ describe('Markdown', () => {
 
     it('uses the generated id when heading text has no slug text', () => {
       render(
-        <Markdown sources={{cite: {title: 'Citation'}}}>{'# [cite]'}</Markdown>,
+        <Markdown
+          plugins={[headingLinks]}
+          sources={{cite: {title: 'Citation'}}}>
+          {'# [cite]'}
+        </Markdown>,
       );
       expect(screen.getByRole('heading')).toHaveAttribute('id', 'section');
       expect(
@@ -270,19 +318,40 @@ describe('Markdown', () => {
       ).toHaveAttribute('href', '#section');
     });
 
-    it('keeps caller-controlled root ids inside a same-document fragment', () => {
+    it('keeps caller-controlled namespaces inside a same-document fragment', () => {
       const unsafeNamespace = ['java', 'script:alert(1)'].join('');
-      // eslint-disable-next-line @eslint-react/dom-no-script-url -- this is an id namespace; the rendered destination starts with #
-      render(<Markdown id={unsafeNamespace}>{'# Overview'}</Markdown>);
+      const namespacedHeadingLinks = createMarkdownHeadingLinks({
+        headingIdPrefix: unsafeNamespace,
+      });
+      render(
+        <Markdown plugins={[namespacedHeadingLinks]}>{'# Overview'}</Markdown>,
+      );
       expect(
         screen.getByRole('link', {name: 'Permalink to Overview'}),
       ).toHaveAttribute('href', `#${unsafeNamespace}--overview`);
+    });
+
+    it('uses a caller-owned safe URL base without product routing', () => {
+      const routedHeadingLinks = createMarkdownHeadingLinks({
+        headingIdPrefix: 'article',
+        permalinkBaseUrl: '/reader?document=42#stale',
+      });
+      render(
+        <Markdown plugins={[routedHeadingLinks]}>{'# Overview'}</Markdown>,
+      );
+      expect(
+        screen.getByRole('link', {name: 'Permalink to Overview'}),
+      ).toHaveAttribute('href', '/reader?document=42#article--overview');
+      expect(() =>
+        createMarkdownHeadingLinks({permalinkBaseUrl: 'javascript:alert(1)'}),
+      ).toThrow(/safe navigation URL/);
     });
 
     it('leaves permalink output to a custom heading renderer at every depth', () => {
       const received: (string | undefined)[] = [];
       render(
         <Markdown
+          plugins={[headingLinks]}
           components={{
             heading: ({children, id}: {children: ReactNode; id?: string}) => {
               received.push(id);

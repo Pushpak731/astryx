@@ -68,11 +68,11 @@ remain unchanged when plugins and math are absent.
   passes the matching explicit parser option.
 - Controlled/uncontrolled behavior: not applicable
 - Migration decision: none
-- Default-path heading change (FR29–FR33): every built-in h1–h6 now exposes a
-  stable id and native sibling permalink. Existing unprefixed ids stay unchanged
-  when the Markdown root has no `id`; a supplied root `id` intentionally
-  namespaces generated heading ids for cross-instance uniqueness. Custom heading
-  renderers receive ids at every depth but keep complete output ownership.
+- Opt-in heading-links plugin (FR29–FR33): `createMarkdownHeadingLinks()`
+  expands heading identity to every h1–h6 and composes the built-in heading with
+  a native sibling permalink. Without the plugin, released root-heading IDs,
+  DOM, styling, and Outline traversal stay unchanged. A supplied custom heading
+  renderer remains untouched and owns its output.
 - Default-path layout change (FR26–FR28): a default table's columns may become
   wider than the released fixed buckets, never narrower; header labels wrap
   instead of truncating; a table that squashed its columns may now scroll.
@@ -107,8 +107,8 @@ Consumer migration instructions belong in consumer docs and release notes.
   rendering observe them.
 - Sharing plugin-enabled parse configuration, transformed heading projection, and
   collision-safe heading IDs with Markdown-derived Outline utilities.
-- Giving every built-in heading a stable direct-link fragment and localized native
-  sibling permalink, including headings nested inside blockquotes and lists.
+- Providing `createMarkdownHeadingLinks()` as the opt-in first-party composition
+  for all-depth heading identity and a localized native sibling permalink.
 - Decoding an optional document-start frontmatter block into caller-defined typed
   metadata, withholding unfinished frontmatter while streaming, and excluding
   completed frontmatter syntax from rendered content.
@@ -149,6 +149,13 @@ metadata through the helper that created it. `spec:AST-036`
 owns the shared protocol and limited Remark compatibility profile,
 `module:Markdown/remark` owns that profile's adapter, and this component owns
 aggregate application and fallback.
+
+`createMarkdownHeadingLinks()` returns one opaque entry for the existing `plugins`
+list. Its options carry a caller-owned stable `headingIdPrefix` and an optional
+sanitized `permalinkBaseUrl`; no Markdown prop or Outline-only identity option is
+added. Passing the same entry to Markdown and Markdown-derived Outline gives both
+surfaces one post-transform projection. Omitting the entry preserves released
+root-only identity and emits no permalink UI.
 
 ### Acceptance and implementation state
 
@@ -202,11 +209,11 @@ unions. Enabled calls return the explicit `InlineNodeWithMath` and
 | FR26 | On the default table path each column has a content-derived width floor: the larger of its own longest unbreakable token and a readable minimum derived from that column's content, bounded so a table of short columns still fits its container. The floor applies to the cell's text, not to its padded box, so it means the same amount of content at every density. A header label contributes its own readable minimum to that comparison. A table whose floors exceed the container grows and scrolls rather than dividing the container equally. |
 | FR27 | Default table header cells never truncate: no ellipsis and no width clamp. A header reads in full, on one line up to a bounded width and wrapping past it. Inline code inside a default table cell keeps its token whole rather than breaking mid-token; a supplied `inlineCode` renderer owns its own wrapping.                                                                                                                                                                                                                                        |
 | FR28 | Markdown's Table block owns spacing, sizing, and alignment. The nested Table's own Scroll region remains the sole owner of the table's horizontal overflow, its accessible name, and its conditional keyboard focusability; Markdown adds no second scroll container, name, or tab stop of its own.                                                                                                                                                                                                                                                     |
-| FR29 | Every built-in block heading renders as a semantic h1–h6 with a stable generated `id` and one sibling native `Link as="a"` whose real `href` is that fragment. The link shows `#`, uses the localized name `Permalink to {heading}`, and bypasses `LinkProvider` and `onLinkClick`, preserving browser copy, open, modified-click, and no-JavaScript behavior without nesting an anchor inside heading content.                                                                                                                                         |
-| FR30 | Markdown and Markdown-derived Outline use one depth-first transformed-heading projection and one emitted-id-reserving allocator. Nested blockquote/list headings receive ids and consume the document-order sequence while Outline continues to return root headings only. NFKC-normalized lowercase slugs preserve Unicode letters and numbers, remove straight quotes, collapse other runs to hyphens, use `section` when empty, and cannot collide with authored numeric suffixes.                                                                   |
-| FR31 | Without a Markdown root `id`, generated fragments keep their released unprefixed form. A supplied root `id` prefixes every generated heading id as a stable cross-instance namespace. `parseOutlineFromMarkdown` and `useOutlineFromMarkdown` accept the matching narrow `headingIdPrefix` option; they never use render-tree position, React `useId`, or another runtime-only source.                                                                                                                                                                  |
-| FR32 | A supplied `components.heading` renderer receives its generated id for every heading depth and owns the complete replacement output, including whether and how to expose a permalink. Markdown adds no wrapper, target, or sibling permalink around that replacement.                                                                                                                                                                                                                                                                                   |
-| FR33 | On hover-capable pointers outside forced colors, a default permalink may be visually quiet at rest but reveals on heading-row hover and keyboard focus. It remains visible for touch/no-hover and forced-colors users, uses logical inline spacing and Link's focus treatment, supports LTR/RTL and light/dark/system themes, and disables its opacity transition under reduced motion.                                                                                                                                                                 |
+| FR29 | Without `createMarkdownHeadingLinks()` in `plugins`, Markdown preserves the released root-heading IDs and emits no heading permalink UI. Installing the factory-created entry opts built-in block headings into one semantic h1–h6 plus a sibling native `Link as="a"`. The link shows `#`, uses the localized name `Permalink to {heading}`, and bypasses `LinkProvider` and `onLinkClick`, preserving browser copy, open, modified-click, and no-JavaScript behavior without nesting an anchor inside heading content.                                |
+| FR30 | Plugin-enabled Markdown and Markdown-derived Outline use one depth-first post-transform heading projection and one emitted-id-reserving allocator. Nested blockquote/list headings receive IDs and consume the document-order sequence while Outline continues to return root headings only. NFKC-normalized lowercase slugs preserve Unicode letters and numbers, remove straight quotes, collapse other runs to hyphens, use `section` when empty, and cannot collide with authored numeric suffixes.                                                 |
+| FR31 | The factory's optional `headingIdPrefix` is the caller-owned stable namespace; omit it for unprefixed fragments. Callers that also need a root DOM ID use the same stable value for Markdown's existing `id`. The optional sanitized `permalinkBaseUrl` replaces only URL-base ownership; native `#id` remains the default. Markdown and Outline never use render-tree position, React `useId`, or another runtime-only source, and product-specific identity, versioning, scrolling, or callback behavior stays outside Astryx.                        |
+| FR32 | With the plugin installed, a supplied `components.heading` renderer receives the generated ID for every heading depth and remains otherwise untouched. It owns the complete replacement output, including whether and how to compose permalink UI; Markdown adds no wrapper, target, or sibling link around that replacement.                                                                                                                                                                                                                           |
+| FR33 | On hover-capable pointers outside forced colors, the plugin's built-in permalink renderer may be visually quiet at rest but reveals on heading-row hover and keyboard focus. It remains visible for touch/no-hover and forced-colors users, uses logical inline spacing and Link's focus treatment, supports LTR/RTL and light/dark/system themes, and disables its opacity transition under reduced motion.                                                                                                                                            |
 
 FR23 includes CommonMark-compatible lazy paragraph continuation inside blockquotes
 and ordered, unordered, or task-list items. Omitting a repeated quote marker or
@@ -242,23 +249,23 @@ text. Outside a table cell, inline code retains its authored backslashes.
 
 ### Representative states
 
-| State                  | Required invariant                                                                                                                                      | Allowed variation                                                                                                     |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Default block content  | Every parsed block uses its corresponding current Markdown target.                                                                                      | Block count, order, density, content width, and alignment.                                                            |
-| Custom block renderers | The replaced Heading, Paragraph, Code block, Blockquote, Divider, or Image lacks the corresponding Markdown target.                                     | Replacement structure and styling.                                                                                    |
-| Ordered/unordered list | List carries `markdown-list`.                                                                                                                           | Marker kind, start value, item count, and nested content.                                                             |
-| Task list              | Each task-marked item carries its own checked state; mixed task/plain items stay in one compatible list and preserve document order and nesting.        | Checked values, item content, and adjacent plain items.                                                               |
-| Safe block image       | Default Image carries `markdown-image`, or a custom image renderer replaces it.                                                                         | Source and alternative text.                                                                                          |
-| Unsafe block image URL | Markdown renders its fallback Image part with `markdown-image`; no custom image renderer receives the rejected URL.                                     | Alternative text shown by the fallback.                                                                               |
-| Inline display         | Document carries `markdown`; no block target renders.                                                                                                   | Inline text, links, code, citations, plugins, and opt-in inline math.                                                 |
-| Math renderer absent   | Dollar-delimited source follows the released Markdown grammar and no `math` node or renderer output exists.                                             | Currency, unmatched delimiters, and ordinary prose.                                                                   |
-| Math renderer present  | Complete supported delimiters are opaque to Markdown formatting and are passed to the renderer as inert text.                                           | Inline or block display and any renderer-owned output.                                                                |
-| Streaming math         | Incomplete math is withheld; once complete, the streamed nodes equal the full-parse nodes at top level and inside list/blockquote containers.           | Delimiters and expression text may arrive in separate chunks; source ranges remain optional.                          |
-| Plugins omitted        | Released parser unions, AST, DOM, targets, heading IDs, and performance remain unchanged.                                                               | Omitted or empty list; both are one empty transform pipeline.                                                         |
-| Plugins enabled        | Fixed syntax → immutable transform → render order, validated roots, readable fallback, and matching Markdown/Outline heading identity remain invariant. | Syntax, transforms, renderers, helper execution plans, plugin order, and live post-parse state.                       |
-| Default heading links  | Every built-in heading has a unique stable id and native sibling permalink; root Outline items resolve to the same ids.                                 | Heading depth, nested container, generated label, pointer modality, direction, theme, and optional root-id namespace. |
-| Custom heading         | Every depth receives its generated id, and Markdown emits no default permalink UI around the replacement.                                               | Replacement DOM, styling, semantics, and permalink presentation.                                                      |
-| Native frontmatter     | A complete leading block is absent from rendered content and yields typed metadata; unfinished streaming input is withheld.                             | Metadata schema and values are caller-defined finite data.                                                            |
+| State                  | Required invariant                                                                                                                                      | Allowed variation                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Default block content  | Every parsed block uses its corresponding current Markdown target.                                                                                      | Block count, order, density, content width, and alignment.                                                |
+| Custom block renderers | The replaced Heading, Paragraph, Code block, Blockquote, Divider, or Image lacks the corresponding Markdown target.                                     | Replacement structure and styling.                                                                        |
+| Ordered/unordered list | List carries `markdown-list`.                                                                                                                           | Marker kind, start value, item count, and nested content.                                                 |
+| Task list              | Each task-marked item carries its own checked state; mixed task/plain items stay in one compatible list and preserve document order and nesting.        | Checked values, item content, and adjacent plain items.                                                   |
+| Safe block image       | Default Image carries `markdown-image`, or a custom image renderer replaces it.                                                                         | Source and alternative text.                                                                              |
+| Unsafe block image URL | Markdown renders its fallback Image part with `markdown-image`; no custom image renderer receives the rejected URL.                                     | Alternative text shown by the fallback.                                                                   |
+| Inline display         | Document carries `markdown`; no block target renders.                                                                                                   | Inline text, links, code, citations, plugins, and opt-in inline math.                                     |
+| Math renderer absent   | Dollar-delimited source follows the released Markdown grammar and no `math` node or renderer output exists.                                             | Currency, unmatched delimiters, and ordinary prose.                                                       |
+| Math renderer present  | Complete supported delimiters are opaque to Markdown formatting and are passed to the renderer as inert text.                                           | Inline or block display and any renderer-owned output.                                                    |
+| Streaming math         | Incomplete math is withheld; once complete, the streamed nodes equal the full-parse nodes at top level and inside list/blockquote containers.           | Delimiters and expression text may arrive in separate chunks; source ranges remain optional.              |
+| Plugins omitted        | Released parser unions, AST, DOM, targets, root-heading IDs, and performance remain unchanged; no permalink UI renders.                                 | Omitted or empty list; both are one empty transform pipeline.                                             |
+| Plugins enabled        | Fixed syntax → immutable transform → render order, validated roots, readable fallback, and matching Markdown/Outline heading identity remain invariant. | Syntax, transforms, renderers, helper execution plans, plugin order, and live post-parse state.           |
+| Heading links plugin   | Every built-in heading has a unique stable ID and native sibling permalink; root Outline items resolve to the same IDs.                                 | Heading depth, nested container, label, pointer modality, direction, theme, namespace, and safe URL base. |
+| Custom heading         | With the plugin installed, every depth receives its generated ID, and Markdown emits no permalink UI around the replacement.                            | Replacement DOM, styling, semantics, and intentionally composed permalink presentation.                   |
+| Native frontmatter     | A complete leading block is absent from rendered content and yields typed metadata; unfinished streaming input is withheld.                             | Metadata schema and values are caller-defined finite data.                                                |
 
 ### Transformation and precedence order
 
@@ -297,12 +304,12 @@ text. Outside a table cell, inline code retains its authored backslashes.
 ## Accessibility contract
 
 The default document semantics, paragraph role, list semantics, scrollable Table
-wrapper, and image alternative text remain unchanged. Every built-in heading keeps
-its semantic h1–h6 role and accessible name while gaining a sibling native permalink;
-the localized link name identifies its destination without adding `#` to the
-heading's own name. The permalink remains keyboard reachable even while visually
-quiet and is always visible when hover is unavailable or forced colors is active.
-Math has no Astryx-owned default output: the caller's renderer owns an accessible
+wrapper, image alternative text, and heading DOM remain unchanged. When the
+heading-links plugin is installed, each built-in heading keeps its semantic h1–h6
+role and accessible name while gaining a sibling native permalink; the localized
+link name identifies its destination without adding `#` to the heading's own name.
+The permalink remains keyboard reachable even while visually quiet and is always
+visible when hover is unavailable or forced colors is active. Math has no Astryx-owned default output: the caller's renderer owns an accessible
 representation appropriate to its typesetting engine (for example MathML or a
 labelled `role="math"` element). Markdown adds no wrapper, ARIA attributes, or
 HTML injection around renderer output. Plugin renderers likewise own their
@@ -312,18 +319,18 @@ required accessible meaning or make meaning color-only.
 
 ## Design relationships
 
-| Anatomy or state | Design requirement                                                                                         | Representation authority              | Hierarchy role | Component contract       |
-| ---------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------- | ------------------------ |
-| Document         | Contains block or inline rendered Markdown content.                                                        | Current source and public docs        | Supporting     | FR1, FR5                 |
-| Heading          | Presents one parsed semantic heading with its resolved level, generated ID, and default sibling permalink. | Current source and component contract | Prominent      | FR2, FR3, FR5, FR29–FR33 |
-| Paragraph        | Presents one prose block using the default composition-safe paragraph structure.                           | Current source and public docs        | Prominent      | FR2, FR3                 |
-| List             | Presents ordered, unordered, or task-list items as one block.                                              | Current source and public docs        | Prominent      | FR2, FR5                 |
-| Code block       | Presents fenced code and owns the outer spacing target on the default path.                                | Current source and public docs        | Prominent      | FR2, FR3, FR4            |
-| Blockquote       | Presents quoted block content on the default path.                                                         | Current source and public docs        | Prominent      | FR2, FR3                 |
-| Table            | Presents parsed rows and columns in a keyboard-scrollable block wrapper.                                   | Current source and public docs        | Prominent      | FR2                      |
-| Divider          | Presents a horizontal separation between blocks.                                                           | Current source and public docs        | Supporting     | FR2, FR3                 |
-| Image            | Presents a safe block image or the fallback for a rejected image URL.                                      | Current source and public docs        | Prominent      | FR2, FR3                 |
-| Math             | Delegates an explicitly enabled expression to the caller's renderer as inert text.                         | Component contract                    | Supporting     | FR6–FR11                 |
+| Anatomy or state | Design requirement                                                                                               | Representation authority              | Hierarchy role | Component contract       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------- | ------------------------ |
+| Document         | Contains block or inline rendered Markdown content.                                                              | Current source and public docs        | Supporting     | FR1, FR5                 |
+| Heading          | Presents one parsed semantic heading; the opt-in heading-links plugin composes identity and a sibling permalink. | Current source and component contract | Prominent      | FR2, FR3, FR5, FR29–FR33 |
+| Paragraph        | Presents one prose block using the default composition-safe paragraph structure.                                 | Current source and public docs        | Prominent      | FR2, FR3                 |
+| List             | Presents ordered, unordered, or task-list items as one block.                                                    | Current source and public docs        | Prominent      | FR2, FR5                 |
+| Code block       | Presents fenced code and owns the outer spacing target on the default path.                                      | Current source and public docs        | Prominent      | FR2, FR3, FR4            |
+| Blockquote       | Presents quoted block content on the default path.                                                               | Current source and public docs        | Prominent      | FR2, FR3                 |
+| Table            | Presents parsed rows and columns in a keyboard-scrollable block wrapper.                                         | Current source and public docs        | Prominent      | FR2                      |
+| Divider          | Presents a horizontal separation between blocks.                                                                 | Current source and public docs        | Supporting     | FR2, FR3                 |
+| Image            | Presents a safe block image or the fallback for a rejected image URL.                                            | Current source and public docs        | Prominent      | FR2, FR3                 |
+| Math             | Delegates an explicitly enabled expression to the caller's renderer as inert text.                               | Component contract                    | Supporting     | FR6–FR11                 |
 
 Custom renderers replace the existing default parts rather than becoming nested
 Markdown anatomy. The opt-in math renderer is also not default anatomy and gets no
@@ -349,12 +356,13 @@ block renderer. The Document remains Markdown-owned in every display mode.
 }
 ```
 
-The map records Markdown's default anatomy and its nine local targets. The Heading
-permalink composes Link and therefore carries Link's own `link` target rather than a
-tenth Markdown-local target. For Heading, Paragraph, Code block, Blockquote,
-Divider, and safe Image, a custom renderer replaces the default part and therefore
-replaces its local target; a custom Heading also replaces the default sibling
-permalink. The `markdown-codeblock` spelling is a released compatibility anomaly: the current
+The map records Markdown's available anatomy and its nine local targets. Heading
+permalink is opt-in plugin anatomy: it composes Link and therefore carries Link's own
+`link` target rather than a tenth Markdown-local target. For Heading, Paragraph,
+Code block, Blockquote, Divider, and safe Image, a custom renderer replaces the
+built-in part and therefore replaces its local target; a custom Heading also prevents
+the plugin's built-in sibling permalink unless the caller composes equivalent UI.
+The `markdown-codeblock` spelling is a released compatibility anomaly: the current
 naming rule would produce `markdown-code-block`, but shipped targets are frozen
 and this change preserves the existing spelling exactly.
 
@@ -370,9 +378,11 @@ and this change preserves the existing spelling exactly.
 - `spec:AST-002/DEC-5` requires this accepted component-local contract to be
   current with the implementation.
 - `family:navigation-destinations` owns the shared accept/block result for parsed
-  links and every caller-controlled Astryx navigation sink. Astryx-generated
-  same-document heading fragments are fixed safe destinations by construction,
-  bypass product routing, and do not widen that caller-controlled family.
+  links and every caller-controlled Astryx navigation sink. The plugin's native
+  same-document fragment is fixed safe output by construction; an optional
+  caller-owned permalink base is sanitized before it reaches the same native
+  anchor. Both bypass product routing, and product-specific artifact URLs,
+  versioning, callbacks, or scroll ownership remain outside Astryx.
   `spec:AST-005/DEC-1` requires
   Markdown parsing and link rendering to preserve the same normalized navigation
   decision as other Core links. Rejected links remain inert and do not reach a
@@ -470,7 +480,7 @@ This projects `spec:AST-036/DEC-1` through `DEC-4` into the component owner. It 
 **Reference:** `component:Markdown/DEC-3`
 **Decider:** `cixzhang`, `2026-09-16`
 
-Markdown parses every extension container's inner span itself and validates children against the plugin's declared content shape, so a callout holds real Markdown while heading identity, protected contexts, navigation policy, and Outline scope stay Core-owned. Containers change what a document can express, not which projection owns heading identity: DEC-7 supersedes this decision's former top-level-only traversal by extending the shared allocator depth-first while preserving Outline's root-heading output. A failed container renderer shows its children rather than literal source. Ownership rejections name the rule and owner; removal of another plugin's nodes is permitted and only minting, editing, internal reordering, duplication, and identity forgery are not.
+Markdown parses every extension container's inner span itself and validates children against the plugin's declared content shape, so a callout holds real Markdown while heading identity, protected contexts, navigation policy, and Outline scope stay Core-owned. Containers change what a document can express, not which projection owns heading identity: DEC-7 adds an opt-in depth-first projection while preserving the released root-only default and Outline's root-heading output. A failed container renderer shows its children rather than literal source. Ownership rejections name the rule and owner; removal of another plugin's nodes is permitted and only minting, editing, internal reordering, duplication, and identity forgery are not.
 
 Markdown also owns the protocol's observability and entry surface: `onPluginDiagnostic` makes every failure visible in production without carrying document content, admission failures degrade instead of throwing at any entrypoint, canonical parse entrypoints and a server-safe parser entry exist beside the released projection, extension types are inferred, and extension output may opt into one theme target without becoming default anatomy.
 
@@ -529,38 +539,39 @@ widening columns by measuring rendered text, which adds an observer and a
 reflow to a purely declarative path; and adding a prop or option for column
 sizing, which would make a default-path defect into a caller's decision.
 
-### DEC-7 — Linkable headings are a default document behavior with stable authored identity
+### DEC-7 — Linkable headings are an opt-in general plugin with caller-owned identity
 
 **Reference:** `component:Markdown/DEC-7`
 **Decider:** `cixzhang`, `2026-10-03`
 
-Every built-in Markdown heading gets a stable generated id and a sibling native
-permalink by default. A document heading is a durable navigation target, not a
-visual enhancement a caller should have to discover and enable. Keeping the link
-beside the semantic h1–h6 preserves the heading's accessible name and prevents
-invalid nested anchors when heading content already contains a link. `Link as="a"`
-with the real fragment intentionally bypasses product routing and Markdown's
-ordinary authored-link interception so browser fragment behavior remains native.
+`createMarkdownHeadingLinks()` is the single public opt-in for all-depth heading
+identity and built-in permalink UI. The released no-plugin path stays root-only and
+emits no link. The plugin uses one post-transform depth-first projection for
+Markdown and Markdown-derived Outline, reserves every emitted ID, and applies NFKC
+plus Unicode letter/number slugging. Its caller-owned `headingIdPrefix` is stable
+across SSR, hydration, reordering, and independent rendering; callers may use the
+same value for Markdown's existing root `id`. Runtime position and React `useId`
+are rejected because copied fragments must remain durable.
 
-One depth-first projection allocates identity for every transformed heading while
-returning only root headings to Markdown-derived Outline. Reserving every emitted
-id prevents natural suffixes from colliding with generated ones. NFKC plus Unicode
-letters and numbers makes identity stable for international documents. The
-Markdown root `id`, when supplied, is the optional cross-instance namespace;
-Outline receives the same explicit prefix. Runtime position, React `useId`, and an
-opt-in behavior prop are rejected because copied fragments must survive hydration,
-reordering, and independent rendering.
+On the built-in heading path, the plugin composes one native sibling anchor beside
+the semantic h1–h6. This preserves the heading's accessible name and avoids nested
+anchors when heading content already contains a link. The default destination is
+`#id`; a sanitized caller-owned `permalinkBaseUrl` may precede that fragment.
+`Link as="a"` intentionally bypasses product routing and Markdown's authored-link
+interception. Artifact identity, URL/version construction, viewer scrolling,
+Outline callbacks, and host behavior remain product-owned.
 
-The default permalink is quiet only where hover is available and forced colors is
-not active. Keyboard focus, touch/no-hover, and forced colors always expose it;
-logical spacing, Link focus treatment, theme tokens, and reduced-motion handling
-keep one behavior across directions and display modes. A custom heading renderer
-still receives identity at every depth but owns all replacement structure and UI.
+The permalink is quiet only where hover is available and forced colors is inactive.
+Keyboard focus, touch/no-hover, and forced colors expose it; logical spacing, Link
+focus treatment, theme tokens, RTL, and reduced-motion handling remain portable. A
+custom `components.heading` renderer still receives plugin-generated identity at
+every depth but is otherwise untouched and owns any intentional permalink
+composition.
 
-Rejected: an opt-in permalink prop, top-level-only allocation, wrapping the heading
-content in the link, delegating fixed fragments to product routers or
-`onLinkClick`, generating ids from render-tree position, or imposing default
-permalink anatomy on `components.heading`.
+Rejected: default-on behavior, a broad Markdown prop, a separate Outline-only
+identity option, top-level-only plugin allocation, wrapping heading content in the
+link, delegating native fragments to product routers or `onLinkClick`, runtime IDs,
+or imposing permalink anatomy around `components.heading`.
 
 ## Open questions
 

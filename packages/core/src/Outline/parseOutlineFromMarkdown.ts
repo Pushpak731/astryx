@@ -34,11 +34,6 @@ export interface ParseOutlineFromMarkdownOptions<
   readonly plugins?: ReadonlyArray<MarkdownPluginEntry<Node>>;
   /** Match Markdown's transform finality while content is streaming. */
   readonly isFinal?: boolean;
-  /**
-   * Prefix generated ids with the same stable namespace as Markdown's root
-   * `id`. Omit it to preserve the released unprefixed fragments.
-   */
-  readonly headingIdPrefix?: string;
 }
 
 export function parseOutlineFromMarkdown<
@@ -56,8 +51,5 @@ export function parseOutlineFromMarkdown<
     {plugins: options?.plugins},
     options?.isFinal ?? true,
   );
-  return [
-    ...projectMarkdownHeadings(root, prepared, options?.headingIdPrefix)
-      .outline,
-  ];
+  return [...projectMarkdownHeadings(root, prepared).outline];
 }

@@ -11,13 +11,13 @@ const anatomy = [
     name: 'Heading',
     required: false,
     description:
-      'Rendered semantic heading block with a stable generated id; a custom heading renderer replaces the default part.',
+      'Rendered semantic heading block; the opt-in heading-links plugin expands stable identity to every depth, and a custom heading renderer replaces the built-in part.',
   },
   {
     name: 'Heading permalink',
     required: false,
     description:
-      'Native sibling fragment link rendered beside every default heading; custom heading renderers own their own permalink UI.',
+      'Native sibling fragment link rendered by the opt-in heading-links plugin on the built-in heading path; custom heading renderers remain untouched.',
   },
   {
     name: 'Paragraph',
@@ -312,12 +312,12 @@ export const docs = {
       {
         guidance: true,
         description:
-          'Every default h1–h6 is a native direct-link target with a sibling permalink. Pair with Outline and useOutlineFromMarkdown for root-heading navigation; nested headings consume the same depth-first id sequence so every fragment stays unique.',
+          'Install createMarkdownHeadingLinks() through plugins when a document needs native h1–h6 permalinks. The no-plugin path stays unchanged; the plugin gives nested headings the same depth-first identity projection used by Markdown-derived Outline.',
       },
       {
         guidance: true,
         description:
-          'When multiple Markdown documents share a page, give each Markdown root a stable id and pass that same value as headingIdPrefix to useOutlineFromMarkdown. Omit both to preserve the standard unprefixed fragments.',
+          'For multiple documents, create one heading-links plugin per document with headingIdPrefix and pass that same plugin to Markdown and useOutlineFromMarkdown. Use the same stable value for Markdown id when the root also needs a DOM id; permalinkBaseUrl may supply a safe caller-owned URL before the fragment.',
       },
       {
         guidance: false,
@@ -346,6 +346,30 @@ import {Text} from '@astryxdesign/core/Text';
   {'Visit https://example.com or email contact@example.com. ' +
     'You can also bracket links: <https://docs.example.com>.'}
 </Markdown>;
+`,
+    },
+    {
+      label: 'Linkable headings',
+      code: `
+import {Markdown} from '@astryxdesign/core/Markdown';
+import {createMarkdownHeadingLinks} from '@astryxdesign/core/Markdown/plugins';
+import {Outline, useOutlineFromMarkdown} from '@astryxdesign/core/Outline';
+
+const documentId = 'guide';
+const headingLinks = createMarkdownHeadingLinks({
+  headingIdPrefix: documentId,
+});
+const plugins = [headingLinks];
+
+function Guide({source}) {
+  const items = useOutlineFromMarkdown(source, {plugins});
+  return (
+    <>
+      <Markdown id={documentId} plugins={plugins}>{source}</Markdown>
+      <Outline items={items} />
+    </>
+  );
+}
 `,
     },
     {
@@ -794,12 +818,12 @@ export const docsZh = {
       {
         guidance: true,
         description:
-          'Every default h1–h6 is a native direct-link target with a sibling permalink. Pair with Outline and useOutlineFromMarkdown for root-heading navigation; nested headings consume the same depth-first id sequence so every fragment stays unique.',
+          'Install createMarkdownHeadingLinks() through plugins when a document needs native h1–h6 permalinks. The no-plugin path stays unchanged; the plugin gives nested headings the same depth-first identity projection used by Markdown-derived Outline.',
       },
       {
         guidance: true,
         description:
-          'When multiple Markdown documents share a page, give each Markdown root a stable id and pass that same value as headingIdPrefix to useOutlineFromMarkdown. Omit both to preserve the standard unprefixed fragments.',
+          'For multiple documents, create one heading-links plugin per document with headingIdPrefix and pass that same plugin to Markdown and useOutlineFromMarkdown. Use the same stable value for Markdown id when the root also needs a DOM id; permalinkBaseUrl may supply a safe caller-owned URL before the fragment.',
       },
       {
         guidance: false,
@@ -886,7 +910,7 @@ export const docsDense = {
       {
         guidance: true,
         description:
-          'Default h1–h6 render stable ids and native sibling permalinks. Markdown-derived Outline returns root headings but shares the depth-first allocator; use the Markdown root id as headingIdPrefix for multiple instances.',
+          'Install createMarkdownHeadingLinks() through plugins to add all-depth stable IDs and native sibling permalinks. Pass the same plugin entry to Markdown-derived Outline; use headingIdPrefix for multiple instances.',
       },
       {
         guidance: false,
@@ -913,7 +937,7 @@ export const docsDense = {
     contentAlign:
       "'start'|'center'. Prose alignment when contentWidth < container. Default: 'start'.",
     plugins:
-      'readonly MarkdownPluginEntry[]. Ordered syntax, immutable AST transforms, and typed extension renderers from createMarkdownPlugin(). Narrow observed extensions with isMarkdownExtensionNode(); renderer callbacks are pure. Default: omitted or empty.',
+      'readonly MarkdownPluginEntry[]. Ordered syntax, immutable AST transforms, and typed extension renderers from createMarkdownPlugin(), plus first-party helpers such as createMarkdownHeadingLinks(). Default: omitted or empty.',
     inlinePlugins:
       'MarkdownInlinePlugin[]. Regex matches in text nodes -> custom inline React elements. Skips inline/fenced code and math.',
     autolink:

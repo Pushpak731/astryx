@@ -9,7 +9,10 @@ import {
   ChatMessage,
   ChatMessageBubble,
 } from '@astryxdesign/core/Chat';
-import {markdownSoftBreaksPlugin} from '@astryxdesign/core/Markdown/plugins';
+import {
+  createMarkdownHeadingLinks,
+  markdownSoftBreaksPlugin,
+} from '@astryxdesign/core/Markdown/plugins';
 import {Button} from '@astryxdesign/core/Button';
 import {Link} from '@astryxdesign/core/Link';
 import {Text} from '@astryxdesign/core/Text';
@@ -202,21 +205,30 @@ const HEADING_LINKS_MD = [
   '## Repeat-1',
 ].join('\n');
 
+const headingLinksLtrPlugins = [
+  createMarkdownHeadingLinks({headingIdPrefix: 'heading-links-ltr'}),
+];
+const headingLinksRtlPlugins = [
+  createMarkdownHeadingLinks({headingIdPrefix: 'heading-links-rtl'}),
+];
+
 export const HeadingPermalinks: Story = {
   name: 'Heading permalinks',
   parameters: {
     docs: {
       description: {
         story:
-          'Every default h1–h6 has a stable native sibling permalink. Nested headings share the depth-first allocator, authored heading links never nest anchors, Unicode ids remain readable, and a stable Markdown root id namespaces each instance.',
+          'The opt-in heading-links plugin gives every built-in h1–h6 a stable native sibling permalink. Nested headings share the depth-first allocator, authored heading links never nest anchors, Unicode ids remain readable, and a caller-owned namespace keeps multiple documents distinct.',
       },
     },
   },
   render: () => (
     <>
-      <Markdown id="heading-links-ltr">{HEADING_LINKS_MD}</Markdown>
+      <Markdown id="heading-links-ltr" plugins={headingLinksLtrPlugins}>
+        {HEADING_LINKS_MD}
+      </Markdown>
       <section dir="rtl" aria-label="Right-to-left heading links">
-        <Markdown id="heading-links-rtl">
+        <Markdown id="heading-links-rtl" plugins={headingLinksRtlPlugins}>
           {'# عنوان قابل للربط\n\n## تفاصيل'}
         </Markdown>
       </section>
@@ -254,7 +266,7 @@ export const HeadingPermalinks: Story = {
     ).toContainElement(within(ltr).getByRole('link', {name: 'guide'}));
     await expect(ltr.querySelector('a a')).toBeNull();
     await expect(
-      within(ltr).getByRole('heading', {name: /Hello Привет 你好/}),
+      within(ltr).getByRole('heading', {name: /Ｈｅｌｌｏ Привет 你好/}),
     ).toHaveAttribute('id', 'heading-links-ltr--hello-привет-你好-123');
     await expect(
       Array.from(ltr.querySelectorAll('h1,h2'))
@@ -271,6 +283,8 @@ export const HeadingPermalinks: Story = {
     await expect(
       canvas.getByRole('link', {name: 'Permalink to عنوان قابل للربط'}),
     ).toHaveAttribute('href', '#heading-links-rtl--عنوان-قابل-للربط');
+    firstPermalink.blur();
+    ltr.dataset.headingLinksPlayComplete = 'true';
   },
 };
 
