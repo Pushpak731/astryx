@@ -35,15 +35,15 @@ review_triggers: [public-api, accessibility, behavior]
 
 ## Contract at a glance
 
-| Area                    | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Public contract         | A list row carries **secondary actions** — real controls the caller supplies in one slot — and one setting for **how they are revealed**: always visible, or adaptively (hover and focus on a fine pointer, a sideways drag that rests open on a coarse pointer). The actions and the reveal are two concepts, declared once (DEC-1, DEC-2). A touch swipe is one reveal affordance over those controls, never a separate action list (DEC-3). The capability lives on the list row, not on the shared `Item` (DEC-4). |
-| Behavior                | On a fine pointer the actions appear at the row's end while the row is hovered or focus is inside it. On a coarse pointer a sideways drag reveals them beside the row and the row rests open so each can be tapped; a long drag or fling fires the outermost one; a short release springs back; one row is open per list. Focus entering an action reveals it under every presentation.                                                                                                                                |
-| End-user impact         | A person on a phone gets the swipe they expect; a person at a laptop gets a clean row that shows its verbs on hover; a keyboard user tabs to the same buttons; a screen-reader user finds them in the tree. Today none of this exists in Astryx, and a product that needs it hand-rolls it in `endContent` or its own CSS.                                                                                                                                                                                             |
-| Builder impact          | One slot and one enum on `ListItem`. The builder renders the verbs as `ListItemAction` controls (or any control) and chooses `always` or `adaptive`. No gesture code, no media queries, no second keyboard path to build.                                                                                                                                                                                                                                                                                              |
-| Compatibility/readiness | Additive: both props are absent by default and every current row is unchanged. `Item` gains nothing. Authority: `draft`; `approved_by` is `null`. Six owner questions are open; OQ1–OQ3 change the public shape, OQ4–OQ6 do not.                                                                                                                                                                                                                                                                                       |
-| Review checks           | Reject a swipe or hover that is the only path to an action; a panel hidden from the accessibility tree while any control inside it can take focus; a second action list declared only for touch; actions declared as data the component renders; swipe or hover-reveal added to `Item`, a `menuitem`, an `option` or a radio row; a second adaptive media query on `List`.                                                                                                                                             |
-| Governing rules         | [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV6, INV7 for every-modality reachability and internal modality; [`spec:AST-002`](../AST-002/spec.md) FR1, FR4, FR15, FR16, `DEC-1` for admission and one responsibility per input; [`spec:AST-055`](../AST-055-caller-rendered-trigger/spec.md) DEC-1 for a caller's control being the interactive element; [`architecture:public-component-api`](../../architecture/public-component-api.md) INV2, INV3, INV5.              |
+| Area                    | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public contract         | A list row carries **secondary actions** — declared once, as data, in one array the row renders as real buttons — and one setting for **how they are revealed**: always visible, or adaptively (hover and focus on a fine pointer, a sideways drag that rests open on a coarse pointer). The actions and the reveal are two concepts (DEC-1, DEC-2). A touch swipe is one reveal affordance over those buttons, never a separate action list (DEC-3). The capability lives on the list row, not on the shared `Item` (DEC-4). |
+| Behavior                | On a fine pointer the actions appear at the row's end while the row is hovered or focus is inside it. On a coarse pointer a sideways drag reveals them beside the row and the row rests open so each can be tapped; a long drag or fling fires the outermost one; a short release springs back; one row is open per list. Focus entering an action reveals it under every presentation.                                                                                                                                       |
+| End-user impact         | A person on a phone gets the swipe they expect; a person at a laptop gets a clean row that shows its verbs on hover; a keyboard user tabs to the same buttons; a screen-reader user finds them in the tree. Today none of this exists in Astryx, and a product that needs it hand-rolls it in `endContent` or its own CSS.                                                                                                                                                                                                    |
+| Builder impact          | One array and one enum on `ListItem`. The builder lists the verbs — `{label, icon, onClick, variant}` in the shape menu rows already use — and chooses `always` or `adaptive`. No gesture code, no media queries, no second keyboard path to build.                                                                                                                                                                                                                                                                           |
+| Compatibility/readiness | Additive: both props are absent by default and every current row is unchanged. `Item` gains nothing. Authority: `draft`; `approved_by` is `null`. Seven owner questions are open; OQ1–OQ4 change the public shape, OQ5–OQ7 do not.                                                                                                                                                                                                                                                                                            |
+| Review checks           | Reject a swipe or hover that is the only path to an action; a panel hidden from the accessibility tree while any control inside it can take focus; a second action list declared only for touch; an action that is not a button smuggled into the array; swipe or hover-reveal added to `Item`, a `menuitem`, an `option` or a radio row; a second adaptive media query on `List`.                                                                                                                                            |
+| Governing rules         | [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV6, INV7 for every-modality reachability and internal modality; [`spec:AST-002`](../AST-002/spec.md) FR1, FR4, FR15, FR16, `DEC-1` for admission and one responsibility per input; [`spec:AST-055`](../AST-055-caller-rendered-trigger/spec.md) DEC-1 for a caller's control being the interactive element; [`architecture:public-component-api`](../../architecture/public-component-api.md) INV2, INV3, INV5.                     |
 
 This table is a review projection; the body below is authoritative.
 
@@ -75,8 +75,8 @@ which is also the menu row and the option row.
 
 **Owns**
 
-- That a row's secondary actions are declared once, as real controls the
-  caller supplies, and that no modality gets its own action list.
+- That a row's secondary actions are declared once, as data the row renders
+  into real buttons, and that no modality gets its own action list.
 - The reveal policy: the closed set of presentations, which modality gets
   which affordance, and that focus reveals under every presentation.
 - The behavior of the coarse-pointer reveal: rest open, accelerate on a long
@@ -122,7 +122,7 @@ which is also the menu row and the option row.
   swipe whose only meaning is dismissal (Toast already has that in
   `useToastGesture` and it is unchanged).
 - **A controlled open state** (`isOpen` / `onOpenChange` per row) and an
-  imperative close handle. Deferred to OQ6; not foreclosed.
+  imperative close handle. Deferred to OQ7; not foreclosed.
 - **Rows outside `List`**: Table rows, TreeList rows, ChatMessage hover
   toolbars, Card rows. They are cited where they bear on the decision and are
   not governed here.
@@ -198,7 +198,7 @@ gesture.
 | `SideNavItem.actions?: ReactNode`                                                                                                                               | The repository already names "row-level secondary controls — siblings of the primary element at the trailing edge" **`actions`**, as a passthrough slot where "each control owns its accessible name, keyboard behavior, and disabled state". The vocabulary exists.              |
 | `Item.endContent` doc: "badges, metadata, timestamps, or action buttons"                                                                                        | Row actions are built today by dropping buttons into `endContent`, always visible. The gap is the reveal, not the slot.                                                                                                                                                           |
 | `Item` consumers: `DropdownMenuItem`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioItem`, `DropdownMenuSubMenu`, `SelectorOption`, `RadioListItem`, `ListItem` | Five of seven hosts render `Item` with a `menuitem`, `option`, or radio role, where an embedded button is invalid ARIA. Only `ListItem` (`role="list"`) permits arbitrary interactive children — the same boundary the owner drew on 2026-10-02 for per-row actions in a listbox. |
-| `useAdaptivePresentation` / `COMPACT_TOUCH_PRESENTATION_QUERY`                                                                                                  | The system's existing adaptive split for overlays is `(max-width: 768px) and (pointer: coarse)`, and the owner ruled a component gets one adaptive query. See OQ3 for why row actions need capability, not width.                                                                 |
+| `useAdaptivePresentation` / `COMPACT_TOUCH_PRESENTATION_QUERY`                                                                                                  | The system's existing adaptive split for overlays is `(max-width: 768px) and (pointer: coarse)`, and the owner ruled a component gets one adaptive query. See OQ4 for why row actions need capability, not width.                                                                 |
 | `Toast/useToastGesture.ts`                                                                                                                                      | A shipped commit-only swipe whose one meaning is dismissal, with constants (`SWIPE_DISMISS_RATIO`) in source. The Compose model is already in core where it fits.                                                                                                                 |
 | #6821 real-device feedback                                                                                                                                      | On an iOS device the swipe required a press-and-hold before it would start, and the row background did not restore until release. The gesture craft the pull request is credited with is not yet settled on a device.                                                             |
 
@@ -211,8 +211,8 @@ last two are deliberately left out.
 | ------------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Mail: archive and delete                         | Yes    | Two controls in `actions`, `adaptive`. Hover or focus shows them; swipe rests them open; long drag fires the outermost.                                                                                              |
 | One destructive action                           | Yes    | One control. Its handler decides whether to confirm first; because the accelerator fires the same handler, a confirming handler is safe under a long drag too.                                                       |
-| Reversible toggle (read/unread, pin/flag)        | Yes    | The caller derives the label from state. A `ListItemAction` is a plain button; it is not an `aria-pressed` toggle, because the label changes with the state and announcing both would double the information.        |
-| More than two actions                            | Yes    | The panel holds N controls at their natural width. Guidance: three is the ceiling before a `More` menu trigger as the last action — a control shape only a slot admits.                                              |
+| Reversible toggle (read/unread, pin/flag)        | Yes    | The caller derives `label` from state. Each action is a plain button, not an `aria-pressed` toggle, because the label changes with the state and announcing both would double the information.                       |
+| More than two actions                            | Yes    | The panel holds N buttons at their natural width. Guidance: three is the ceiling before the tail moves into a `MoreMenu` in `endContent`, which takes the same descriptors.                                          |
 | An action that opens a confirm                   | Yes    | The control's handler opens the dialog; nothing in the row needs to know.                                                                                                                                            |
 | Rows in a virtualized list                       | Yes    | One open row per list (FR7); a row that unmounts or leaves the viewport closes. The gesture yields to the scroller on a mostly vertical drag (FR6).                                                                  |
 | Rows that are links (`href`)                     | Yes    | On a fine pointer the anchor is the primary and the actions reveal on hover/focus. On a coarse pointer the drag is distinguished from the tap by the axis lock, and the synthesized click after a drag is swallowed. |
@@ -224,9 +224,11 @@ last two are deliberately left out.
 
 Three shapes were taken far enough to write a callsite, cost, and
 accessibility answer for each. The vibe test in the next section ran all
-three.
+three. The record's author started from Option B on system grounds and was
+moved to Option A by the test; both arguments are kept below so the owner can
+weigh them.
 
-### Option A — Declared actions (data array)
+### Option A — Declared actions (data array) — recommended
 
 ```tsx
 <ListItem
@@ -238,30 +240,40 @@ three.
   actions={[
     {
       label: 'Archive',
-      icon: <Icon name="archive" />,
-      onAction: () => archive(message.id),
+      icon: <Icon icon={ArchiveIcon} />,
+      onClick: () => archive(message.id),
     },
     {
       label: 'Delete',
-      icon: <Icon name="trash" />,
-      onAction: () => remove(message.id),
-      tone: 'error',
+      icon: <Icon icon={TrashIcon} />,
+      onClick: () => remove(message.id),
+      variant: 'destructive',
     },
   ]}
 />
 ```
 
 - Count: an array; N per row. Rest: yes. Accessibility: structural — the
-  component renders one real button per entry, so a label is guaranteed and
-  nothing is pointer-only.
-- Costs: the first prop on a row that holds data the component renders
-  itself; every row slot today is a `ReactNode`. The name `actions` would
-  carry two shapes in core (`SideNavItem.actions` is a node), against
-  `architecture:public-component-api` INV2. The descriptor type is permanent.
-- Forecloses: any control that is not a button — a `More` menu trigger, a
-  toggle, a link — unless the descriptor grows a field per kind.
+  row renders one real button per entry, so an accessible name is guaranteed
+  (`label` is a required string) and nothing is pointer-only.
+- Fits what exists: `DropdownMenu.items` and `MoreMenu.items` already
+  declare actions as data in exactly this field vocabulary —
+  `DropdownMenuItemData` is `{id?, label, icon, onClick, isDisabled,
+variant: 'default' | 'destructive', …}`, and data mode "renders through
+  `DropdownMenuItem`, so the two APIs describe the same thing". A row's
+  actions and a menu's rows are the same kind of thing: verbs with a label,
+  an icon, a handler, and a destructive marker. One vocabulary, two hosts.
+- Costs: the first prop on a list row that holds data the row renders
+  itself; every other row slot is a `ReactNode`. `SideNavItem.actions` is a
+  `ReactNode` slot, so one name would carry two shapes in core (OQ2). The
+  descriptor type is permanent.
+- Forecloses: a control that is not a button — a `More` menu trigger, a
+  toggle, a link — unless the descriptor grows. Mitigation that costs no
+  API: because the descriptors are `MoreMenu.items`-compatible, a product
+  with more verbs than fit routes the tail into a `MoreMenu` in `endContent`,
+  and a later additive change can let the row do that overflow itself.
 
-### Option B — Composed actions (slot of controls) — recommended
+### Option B — Composed actions (slot of controls)
 
 ```tsx
 <ListItem
@@ -274,14 +286,14 @@ three.
     <>
       <ListItemAction
         label="Archive"
-        icon={<Icon name="archive" />}
+        icon={<Icon icon={ArchiveIcon} />}
         onClick={() => archive(message.id)}
       />
       <ListItemAction
         label="Delete"
-        icon={<Icon name="trash" />}
+        icon={<Icon icon={TrashIcon} />}
         onClick={() => remove(message.id)}
-        tone="error"
+        variant="destructive"
       />
     </>
   }
@@ -289,17 +301,23 @@ three.
 ```
 
 - Count: N; the panel measures its rendered width. Rest: yes. Accessibility:
-  structural — the controls are real elements in the tree in every state;
-  focus entering any of them reveals the panel (AR1); the component finds the
-  outermost control in the rendered DOM for the accelerator, which is
-  derivation from the DOM, not inspection of `ReactNode` children.
-- Costs: `ListItemAction` must exist as the blessed control so the panel's
-  look is consistent; a caller who drops a bare `<button>` in gets a working
-  but unstyled action. The component cannot verify an accessible name — but
-  it never could for `endContent` either, and `ListItemAction` requires
-  `label`.
-- Forecloses: nothing the field has needed. A `More` menu, a link action, a
-  toggle all fit.
+  structural if the caller uses `ListItemAction`; the component finds the
+  outermost control in the rendered DOM for the accelerator.
+- The case for it: the controls are interactive elements the caller supplies
+  (`spec:AST-055` DEC-1's reasoning); `SideNavItem.actions` already means a
+  passthrough slot of row controls; the API Conventions page routes
+  arbitrary content to composition; Ionic, Framework7, react-swipeable-list
+  and SwiftUI take children. A `More` menu trigger drops straight in.
+- Why it loses: the vibe test. Recognition tied with A at the ceiling, but
+  every recall-probe builder (3/3) expected a data array and rejected child
+  components unprompted, for two reasons that are also the system's: a list
+  row has no children and everything else on it is leaf-shaped, and the row
+  can only promise the reveal, the panel width and the tab order if it knows
+  the verbs discretely. `AST-055`'s reasoning does not transfer cleanly
+  either: there the caller already has a control it wants to be the element;
+  here the caller has verbs, not controls. The component cannot verify a
+  name on a bare `<button>` a caller drops in, and the panel's look depends
+  on the caller choosing the blessed control.
 
 ### Option C — Touch-only commit swipe (#6821, made deliberate)
 
@@ -326,10 +344,13 @@ three.
   the panel is `aria-hidden` and the caller owes every verb a second path that
   nothing checks.
 - Costs: fails `architecture:interaction-modality` INV7 unless each caller
-  builds the second path; in the vibe test the callers who tried built a
-  selection model and a toolbar, changing the row's primary action to
-  "select". Widening to an array later breaks `ItemSwipeActions`. Hosted on
-  `Item`, it reaches menu and option rows where a panel of controls is invalid.
+  builds the second path. In the vibe test the naive builders reproduced
+  every review finding: one built a selection model and a toolbar, changing
+  what clicking a row does; one declined the API because commit-and-slide-out
+  cannot precede a confirmation dialog; one could not fit four verbs into
+  two slots and duplicated two of them. Widening to an array later breaks
+  `ItemSwipeActions`. Hosted on `Item`, it reaches menu and option rows where
+  a panel of controls is invalid.
 - Honest case for it: it is Material's position (swipe means one thing per
   direction; everything richer is a menu), it is already in core where it
   fits (Toast), and it is the least machinery. If the owner takes it, it must
@@ -338,27 +359,25 @@ three.
 
 ### Recommendation
 
-**Option B, on `ListItem`.** The actions are interactive elements the caller
-supplies, which is the fact `spec:AST-055` DEC-1 settled for triggers; the
-word `actions` already means a passthrough slot of row controls in core; the
-API Conventions page routes "content is arbitrary / user-defined" to
-composition; six of the seven surveyed libraries that hold N actions take
-children; and the component needs no data about an action to reveal it,
-measure it, or accelerate to it — only the DOM it rendered. Option A's
-strongest argument — that declared data lets the component render the same
-actions somewhere keyboard-reachable — is answered by focus-reveal: the panel
-_is_ the keyboard-reachable place, as React Aria's own example shows.
+**Option A, on `ListItem`, with the descriptor in the menu-row vocabulary.**
+The field survey, the system argument and the builders agree that the
+component owns the reveal and therefore needs the verbs as data; the recall
+probe says that is also the shape a builder reaches for without being told;
+and core already declares actions as data for menus, so this adds a host, not
+a vocabulary. Option B's one real advantage — a non-button in the panel — is
+covered by routing overflow into `MoreMenu`, which consumes the same data.
 
 ## Public API and concepts
 
-| Concept                  | Closed values or states                                                                                    | Meaning                                                                                                                                                                                      | Default  | Owner            | Stability |
-| ------------------------ | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | --------- |
-| `ListItem.actions`       | `ReactNode`                                                                                                | The row's secondary actions: real controls, rendered after the row's content in one group. Passthrough; each control owns its name, keyboard behavior, and disabled state.                   | absent   | `spec:AST-057`   | proposed  |
-| `ListItem.actionsReveal` | `'always'` \| `'adaptive'`                                                                                 | How the actions are revealed. `always`: visible at the row's end. `adaptive`: hover and focus-within on a fine pointer; a sideways drag that rests open on a coarse pointer.                 | `always` | `spec:AST-057`   | proposed  |
-| `ListItemAction`         | `label: string`, `icon?`, `onClick`, `tone?: 'accent' \| 'success' \| 'warning' \| 'error'`, `isDisabled?` | The control made for the slot: a button that paints as a block of its tone inside the revealed panel and as an icon button in the hover reveal. Any other control is also valid in the slot. | —        | `component:List` | proposed  |
-| rest state               | closed, open                                                                                               | On a coarse pointer the row rests open after a drag past the panel's width, until closed (FR5, FR7).                                                                                         | closed   | `spec:AST-057`   | proposed  |
-| full-swipe accelerator   | on                                                                                                         | A drag past the commit point or a fling fires the outermost action of the revealed side (FR5; default under OQ4).                                                                            | on       | `spec:AST-057`   | proposed  |
-| the modality split       | internal                                                                                                   | Which affordance a device gets is derived from browser input capability, not a prop (`architecture:interaction-modality` INV6; query under OQ3).                                             | —        | `spec:AST-057`   | proposed  |
+| Concept                  | Closed values or states                                                                                                                            | Meaning                                                                                                                                                                                                    | Default  | Owner            | Stability |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ---------------- | --------- |
+| `ListItem.actions`       | `ListItemActionData[]`                                                                                                                             | The row's secondary actions, in order. The row renders one real button per entry after its content; the last entry sits at the row's outer edge.                                                           | absent   | `spec:AST-057`   | proposed  |
+| `ListItemActionData`     | `{id?: string; label: string; icon?: ReactNode; onClick: () => void \| Promise<void>; isDisabled?: boolean; variant?: 'default' \| 'destructive'}` | One verb. The field names are `DropdownMenuItemData`'s, so an action list can also feed `MoreMenu.items`. `label` is the button's accessible name and is required; an icon-only presentation still has it. | —        | `component:List` | proposed  |
+| `ListItem.actionsReveal` | `'always'` \| `'adaptive'`                                                                                                                         | How the actions are revealed. `always`: visible at the row's end. `adaptive`: hover and focus-within on a pointer that can hover; a sideways drag that rests open on one that cannot; focus everywhere.    | `always` | `spec:AST-057`   | proposed  |
+| rest state               | closed, open                                                                                                                                       | On a coarse pointer the row rests open after a drag past the panel's width, until closed (FR5, FR7).                                                                                                       | closed   | `spec:AST-057`   | proposed  |
+| full-swipe accelerator   | on                                                                                                                                                 | A drag past the commit point or a fling fires the **last** action — the one at the row's outer edge (FR5; default under OQ5).                                                                              | on       | `spec:AST-057`   | proposed  |
+| the modality split       | internal                                                                                                                                           | Which affordance a device gets is derived from browser input capability, not a prop (`architecture:interaction-modality` INV6; query under OQ4).                                                           | —        | `spec:AST-057`   | proposed  |
+| a row with no primary    | static row                                                                                                                                         | A row with `actions` and no `onClick`/`href` is not itself focusable; its actions are its tab stops. Under `adaptive` they reveal on hover and on focus like any other row's.                              | —        | `spec:AST-057`   | proposed  |
 
 Not public: axis-lock distance, commit ratio, fling velocity, durations,
 resistance, panel widths. They are behavior constants.
@@ -367,23 +386,23 @@ resistance, panel widths. They are behavior constants.
 
 ### Behavioral contract
 
-| ID  | Invariant                                                                                                                                                                                                                                                                                                                                                                                                              | Basis                                                                           | Verification state                                              |
-| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| FR1 | A list row MUST take its secondary actions as one `ReactNode` slot named `actions`, rendered as given in one group after the row's content. The component MUST NOT inspect the slot's children to decide behavior; anything it needs about the actions it MUST derive from the rendered DOM.                                                                                                                           | DEC-1; `SideNavItem.actions`; the 2026-10-02 `ReactNode` introspection boundary | Proposed; no evidence on `main`                                 |
-| FR2 | The reveal MUST be one enum, `actionsReveal`, with the closed values `always` and `adaptive`, default `always`. There MUST NOT be a second action list, prop, or slot for any one modality.                                                                                                                                                                                                                            | DEC-2, DEC-3; `spec:AST-002` FR16                                               | Proposed                                                        |
-| FR3 | Under `always`, the actions MUST render visible at the row's end in every modality, exactly as `endContent` content would, and no gesture MUST be attached.                                                                                                                                                                                                                                                            | DEC-2                                                                           | Proposed                                                        |
-| FR4 | Under `adaptive` on a device whose primary input can hover, the actions MUST appear while the row is hovered and while focus is inside the row or its actions, and MUST otherwise be visually hidden but present. Hover MUST NOT be the only path (AR2).                                                                                                                                                               | `architecture:interaction-modality` INV4                                        | Proposed                                                        |
-| FR5 | Under `adaptive` on a device whose primary input cannot hover, a sideways drag MUST reveal the actions beside the row, and a release past the panel's width MUST leave the row resting open with every action tappable. A release short of that MUST spring back. A drag past the commit point, or a fling, MUST fire the outermost action of the revealed side and MUST NOT fire any other (OQ4 governs the default). | DEC-3; UIKit `performsFirstActionWithFullSwipe`; Framework7 overswipe           | Proposed; real-device evidence required                         |
-| FR6 | The drag MUST decide its axis once, early, and a mostly vertical drag MUST stay the scroller's. A mouse MUST NOT start the drag. The click the browser synthesizes after a drag MUST NOT fire the row's primary action.                                                                                                                                                                                                | #6821's gesture; press-model ORD1                                               | Proposed; device feedback on #6821 shows the first is unsettled |
-| FR7 | At most one row per `List` MUST rest open. Opening another, tapping outside, scrolling the list, pressing Escape with focus inside, or firing an action MUST close it. A row that unmounts closes.                                                                                                                                                                                                                     | SwiftUI `swipeActionsContainer()`; Framework7 `app.swipeout.el`                 | Proposed                                                        |
-| FR8 | Directions MUST be logical: the panel revealed by a drag toward the inline end sits at the inline start, and the reverse, so the finger, the revealed edge, and the panel agree under RTL.                                                                                                                                                                                                                             | #6821; `architecture:public-component-api` INV2 (logical direction)             | Proposed                                                        |
-| FR9 | `Item` MUST NOT gain `actions`, `actionsReveal`, a swipe gesture, or a hover reveal. Any row rendered with a `menuitem`, `option`, or radio role MUST NOT host the capability.                                                                                                                                                                                                                                         | DEC-4; ARIA allowed-children rules                                              | Proposed; shipped `Item` conforms today                         |
+| ID  | Invariant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Basis                                                                 | Verification state                                              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------- |
+| FR1 | A list row MUST take its secondary actions as one array of descriptors, `actions: ListItemActionData[]`, and MUST render one real `<button>` per entry, in order, named by `label`. The descriptor's fields MUST keep the names and meanings of `DropdownMenuItemData` (`id`, `label`, `icon`, `onClick`, `isDisabled`, `variant`) so one action list can serve a row and a `MoreMenu`. A descriptor MUST NOT carry a node the component renders as the control.                                                                                                                                                | DEC-1; `DropdownMenu.items`, `MoreMenu.items`; vibe recall 3/3        | Proposed; no evidence on `main`                                 |
+| FR2 | The reveal MUST be one enum, `actionsReveal`, with the closed values `always` and `adaptive`, default `always`. There MUST NOT be a second action list, prop, or slot for any one modality.                                                                                                                                                                                                                                                                                                                                                                                                                     | DEC-2, DEC-3; `spec:AST-002` FR16                                     | Proposed                                                        |
+| FR3 | Under `always`, the actions MUST render visible at the row's end in every modality, exactly as `endContent` content would, and no gesture MUST be attached.                                                                                                                                                                                                                                                                                                                                                                                                                                                     | DEC-2                                                                 | Proposed                                                        |
+| FR4 | Under `adaptive` on a device whose primary input can hover, the actions MUST appear while the row is hovered and while focus is inside the row or its actions, and MUST otherwise be visually hidden but present. Hover MUST NOT be the only path (AR2).                                                                                                                                                                                                                                                                                                                                                        | `architecture:interaction-modality` INV4                              | Proposed                                                        |
+| FR5 | Under `adaptive` on a device whose primary input cannot hover, a sideways drag MUST reveal the actions beside the row, and a release past the panel's width MUST leave the row resting open with every action tappable. A release short of that MUST spring back. A drag past the commit point, or a fling, MUST fire the **last** entry of `actions` — the one rendered at the row's outer edge — and MUST NOT fire any other (OQ5 governs the default). Firing an action closes the row; a handler that returns a Promise is awaited for nothing, so a confirming handler opens its dialog from a closed row. | DEC-3; UIKit `performsFirstActionWithFullSwipe`; Framework7 overswipe | Proposed; real-device evidence required                         |
+| FR6 | The drag MUST decide its axis once, early, and a mostly vertical drag MUST stay the scroller's. A mouse MUST NOT start the drag. The click the browser synthesizes after a drag MUST NOT fire the row's primary action.                                                                                                                                                                                                                                                                                                                                                                                         | #6821's gesture; press-model ORD1                                     | Proposed; device feedback on #6821 shows the first is unsettled |
+| FR7 | At most one row per `List` MUST rest open. Opening another, tapping outside, scrolling the list, pressing Escape with focus inside, or firing an action MUST close it. A row that unmounts closes.                                                                                                                                                                                                                                                                                                                                                                                                              | SwiftUI `swipeActionsContainer()`; Framework7 `app.swipeout.el`       | Proposed                                                        |
+| FR8 | Directions MUST be logical: the panel revealed by a drag toward the inline end sits at the inline start, and the reverse, so the finger, the revealed edge, and the panel agree under RTL.                                                                                                                                                                                                                                                                                                                                                                                                                      | #6821; `architecture:public-component-api` INV2 (logical direction)   | Proposed                                                        |
+| FR9 | `Item` MUST NOT gain `actions`, `actionsReveal`, a swipe gesture, or a hover reveal. Any row rendered with a `menuitem`, `option`, or radio role MUST NOT host the capability.                                                                                                                                                                                                                                                                                                                                                                                                                                  | DEC-4; ARIA allowed-children rules                                    | Proposed; shipped `Item` conforms today                         |
 
 ### Accessibility contract
 
 - **AR1 — The actions are real controls in the tree in every state.** Under
-  every value of `actionsReveal`, the controls in `actions` are rendered,
-  focusable, and in the tab order whether or not they are painted. Focus
+  every value of `actionsReveal`, the buttons rendered from `actions` are
+  present, focusable, and in the tab order whether or not they are painted. Focus
   entering any of them MUST reveal the panel (on a fine pointer: the hover
   state; on a coarse pointer: the rest-open state). The panel MUST NOT be
   `aria-hidden`, `inert`, or `display: none` while any control inside it can
@@ -404,7 +423,7 @@ resistance, panel widths. They are behavior constants.
 - **AR5 — The row's primary stays one tab stop.** Adding actions adds stops
   after the row's primary element in DOM order; it does not change the
   primary's role, name, or activation. An action's accessible name is its own
-  (`ListItemAction.label` is required); the row's name does not absorb it.
+  (`label` is required); the row's name does not absorb it.
 
 ### Platform support
 
@@ -431,11 +450,34 @@ and the props deliberately unnamed. Battery, generator, arm docs, task
 prompts, raw results, and the scored table live in
 [`internal/vibe-tests/row-actions-shape-test/`](../../../internal/vibe-tests/row-actions-shape-test/RESULTS.md).
 
-<!-- VIBE-SUMMARY -->
+**Outcome.** Recognition: Options A and B tied at the ceiling — 8/8 correct,
+0/8 hallucinated, 8/8 typechecked against their stubs, every output left a
+keyboard path by construction. Option C's agents read its doc correctly and
+still reproduced the three review findings: one built a selection model and a
+toolbar to satisfy the "reachable elsewhere" sentence, one declined the API
+because commit-and-slide-out cannot precede a confirmation, one could not fit
+four verbs into two slots. The negative control held in all three arms.
+Recall: 3/3 builders expected `actions` as an **array of `{label, icon,
+onClick, isDestructive}`**, 0/3 child components, 0/3 a render prop, with the
+same two reasons each — a row has no children and is otherwise leaf-shaped,
+and the row can only own the reveal if it knows the verbs. 3/3 named the
+handler `onClick`. That probe decided OQ1's recommendation (DEC-1).
+
+**Doc gaps the winning arms shared,** now requirements here: which end is
+outermost (FR5 names the last entry); that focus reveals, said plainly (AR1,
+and FR4's consumer-doc clause); what a row with actions and no primary is
+(the concepts table); that a handler may return a Promise (FR5).
+
+**What it did not prove.** Scores were assigned by the test's designer, not a
+separate judge, to stay inside the agent budget; the hard numbers are the
+typecheck column and the recall counts. Agents had the reference page only —
+no project, no CLI — so discoverability through `astryx component` was not
+measured. No implementation exists; every stub is a type this record
+proposes.
 
 ## Current-state impact
 
-- `component:List` gains `actions`, `actionsReveal`, and `ListItemAction` as
+- `component:List` gains `actions`, `actionsReveal`, and `ListItemActionData` as
   local public concepts when an implementation lands, citing this record for
   the shape and the reveal policy rather than recording a private copy.
 - `architecture:interaction-modality` gains `spec:AST-057` in its deciding
@@ -459,14 +501,14 @@ prompts, raw results, and the scored table live in
 
 ## Verification
 
-| Contract      | Verification                                                                                       | Representative states                                                                                | Mutation or failure expectation                                                                                                  |
-| ------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| FR1, FR2, FR9 | `ListItem` prop-surface suite plus exported-type checks; `Item` surface inventory                  | `actions` with one, two, and four controls; a non-`ListItemAction` control; `Item` with no new props | A second action list, a per-modality prop, a component reading `actions` children, or a new `Item` prop fails.                   |
-| FR3, FR4, AR1 | jsdom focus suite plus real-Chromium hover and focus evidence                                      | `always`; `adaptive` with a hovering pointer; focus entering an action by Tab                        | An action absent from the tab order, a panel `aria-hidden` while focusable, or hover with no focus equivalent fails.             |
-| FR5, FR6, FR8 | Real-Chromium dispatched-touch evidence plus physical-device check; RTL via the direction provider | Release short, past the panel, past the commit point, fling; vertical drag; mouse drag; RTL          | Immediate fire with no rest, the wrong action fired, a vertical drag captured, a mouse drag starting, or a mirrored panel fails. |
-| FR7           | List-level suite                                                                                   | Two rows opened in turn; outside tap; scroll; Escape; action fired; row unmounted                    | Two rows open, or a row that stays open after any closing event, fails.                                                          |
-| AR2, AR3, AR4 | Keyboard and screen-reader paths in the owning component's accessibility suite                     | A fine pointer without hover; a touch screen reader cursor on an action                              | Any action reachable only by hover or only by swipe fails.                                                                       |
-| AR5           | Accessible-name and tab-order assertions                                                           | Row with primary and two actions                                                                     | The row's name absorbing an action's label, or an action lacking its own name, fails.                                            |
+| Contract      | Verification                                                                                       | Representative states                                                                                          | Mutation or failure expectation                                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| FR1, FR2, FR9 | `ListItem` prop-surface suite plus exported-type checks; `Item` surface inventory                  | `actions` with one, two, and four entries; the same array passed to `MoreMenu.items`; `Item` with no new props | A second action list, a per-modality prop, a descriptor field that diverges from `DropdownMenuItemData`, or a new `Item` prop fails. |
+| FR3, FR4, AR1 | jsdom focus suite plus real-Chromium hover and focus evidence                                      | `always`; `adaptive` with a hovering pointer; focus entering an action by Tab                                  | An action absent from the tab order, a panel `aria-hidden` while focusable, or hover with no focus equivalent fails.                 |
+| FR5, FR6, FR8 | Real-Chromium dispatched-touch evidence plus physical-device check; RTL via the direction provider | Release short, past the panel, past the commit point, fling; vertical drag; mouse drag; RTL                    | Immediate fire with no rest, the wrong action fired, a vertical drag captured, a mouse drag starting, or a mirrored panel fails.     |
+| FR7           | List-level suite                                                                                   | Two rows opened in turn; outside tap; scroll; Escape; action fired; row unmounted                              | Two rows open, or a row that stays open after any closing event, fails.                                                              |
+| AR2, AR3, AR4 | Keyboard and screen-reader paths in the owning component's accessibility suite                     | A fine pointer without hover; a touch screen reader cursor on an action                                        | Any action reachable only by hover or only by swipe fails.                                                                           |
+| AR5           | Accessible-name and tab-order assertions                                                           | Row with primary and two actions                                                                               | The row's name absorbing an action's label, or an action lacking its own name, fails.                                                |
 
 Known verification gap: none of the suites above exist on `main`, and no
 component implements the contract. This record is `draft`, does not govern
@@ -477,32 +519,41 @@ review, and names no implementation.
 Every decision below is **proposed**. None has been ruled on; `approved_by`
 is `null` and the record is `draft`.
 
-### DEC-1 — Actions are a slot of real controls, not data
+### DEC-1 — Actions are declared as data the row renders
 
 **Reference:** `spec:AST-057/DEC-1`
 **Decider:** `cixzhang`, `<pending>`
 
-A row's secondary actions are supplied as `ReactNode` in one slot named
-`actions`, rendered as given. `ListItemAction` is the control made for the
-slot; any control is valid there.
+A row's secondary actions are one array of descriptors, `actions:
+ListItemActionData[]`, in the field vocabulary menu rows already use
+(`label`, `icon`, `onClick`, `isDisabled`, `variant`). The row renders one
+real button per entry.
 
-The actions are interactive elements. `spec:AST-055` DEC-1 settled that a
-caller's control must _be_ the interactive element rather than content the
-component wraps in one; the same reasoning holds when the controls are the
-actions themselves. The word is already taken in this sense —
-`SideNavItem.actions` is a passthrough slot of row controls — so a data array
-under the same name would give one name two shapes. The API Conventions
-page routes arbitrary, user-defined content to composition. And the
-component needs no data about an action to do its job: it reveals, measures,
-and accelerates to the elements it rendered.
+The row owns the reveal — hover, focus, the drag, the rest state, the
+accelerator, the tab order — and can only promise those if it knows the
+verbs discretely: how many there are, what each is called, which one is
+last. Core already declares verbs as data for the same reason in
+`DropdownMenu.items` and `MoreMenu.items`, whose data mode "renders through
+`DropdownMenuItem`, so the two APIs describe the same thing". Reusing that
+vocabulary adds a host to an existing concept rather than a second concept.
+The vibe test's recall probe found the same shape in every builder's hands
+without being told (3/3), and found the handler name `onClick` the same way.
 
-Rejected: an array of `{label, icon, onAction, tone}` descriptors the
-component renders itself. It would be the first row prop holding data the
-component renders, it forecloses any control that is not a plain button (a
-`More` menu trigger is the first casualty), and its one real advantage —
-rendering the same actions somewhere keyboard-reachable — is already
-delivered by focus-reveal. The vibe test's recall probes are the evidence on
-which shape builders expect; see the results.
+Rejected: a `ReactNode` slot of `ListItemAction` controls. It was this
+record's first draft, on the strength of `spec:AST-055` DEC-1 (a caller's
+control is the interactive element), `SideNavItem.actions` (already a slot of
+row controls), and the composition-over-configuration guidance. The vibe test
+tied the two at the ceiling on recognition and rejected the slot 3–0 on
+recall, with reasons that are also the system's: a list row has no children
+and is otherwise leaf-shaped, and the row cannot size a panel or keep it open
+around content it does not understand. `AST-055` does not transfer cleanly —
+there the caller already holds a control; here the caller holds verbs. The
+slot's one real advantage, a non-button in the panel, is answered by routing
+overflow into `MoreMenu`, which consumes the same descriptors.
+
+Also rejected: a per-modality object (`swipeActions={{leading, trailing}}`).
+It is a second action list for one modality, which DEC-2 and DEC-3 rule out,
+and its one-per-side cap is the commit-only model's consequence.
 
 ### DEC-2 — One reveal policy, chosen by modality, not by the caller
 
@@ -568,21 +619,33 @@ caller markup — are served by `ListItem`.
 
 ## Open questions
 
-- **OQ1 — Does the recommendation stand: a slot of controls (Option B) rather than declared data (Option A)?** (`human-api`)
+- **OQ1 — Does the recommendation stand: declared data (Option A) rather than a slot of controls (Option B)?** (`human-api`)
 
-  The vibe test measured discoverability for both; DEC-1 argues the slot on
-  system grounds. If the owner prefers declared data for the guarantees it
-  gives (a required label, a closed tone set, a consistent panel look), FR1
-  and DEC-1 flip and `actions` needs a different name than `SideNavItem`'s.
+  Recognition tied; recall went 3–0 for data; the system argument for data
+  is the menu-row vocabulary. If the owner prefers the slot for the
+  flexibility it gives (a `More` trigger, a toggle, a link in the panel),
+  FR1 and DEC-1 flip and `ListItemAction` becomes a public component.
 
-- **OQ2 — Is the default `always`, or `adaptive`?** (`human-design`)
+- **OQ2 — Is the prop named `actions`, given `SideNavItem.actions` is a `ReactNode` slot?** (`human-api`)
 
-  `always` is the conservative default: adding `actions` behaves like
-  `endContent` until a builder asks for the reveal. `adaptive` would make
-  every row with actions hover-reveal by default, which is what mail clients
-  do but changes what a builder sees on first render.
+  Every recall builder named it `actions`; one weighed `secondaryActions`.
+  `architecture:public-component-api` INV2 wants one name to carry one
+  meaning. Options: accept the divergence and note that `SideNavItem` is a
+  navigation row, not a list row; rename here (`secondaryActions`); or plan
+  `SideNavItem.actions` toward data in its own record. The recommendation is
+  `actions` with the divergence recorded, because the builders' instinct and
+  the menu-row precedent both point at it.
 
-- **OQ3 — Which adaptive query?** (`human-api`)
+- **OQ3 — Is the destructive marker `variant: 'default' | 'destructive'` (the menu-row word) or #6821's `tone: 'accent' | 'success' | 'warning' | 'error'`?** (`human-design`)
+
+  3/3 recall builders invented a boolean `isDestructive`; `DropdownMenuItem`
+  ships `variant` with the same two values; `Step.status` ships the
+  four-value set. `variant` keeps one action vocabulary across menus and
+  rows and matches what builders reached for. The four-tone set lets a
+  product paint "Archive" green as iOS Mail does, at the cost of a second
+  vocabulary for the same kind of thing. The recommendation is `variant`.
+
+- **OQ4 — Which adaptive query?** (`human-api`)
 
   The owner ruled one adaptive query per component, and the overlay query is
   `(max-width: 768px) and (pointer: coarse)`. Row actions need capability,
@@ -593,21 +656,22 @@ caller markup — are served by `ListItem`.
   query. Confirm, or rule that the overlay query is reused and accept the
   tablet gap.
 
-- **OQ4 — Does a long drag fire the outermost action by default?** (`human-design`)
+- **OQ5 — Does a long drag fire the last action by default?** (`human-design`)
 
   UIKit and SwiftUI default to yes; react-swipeable-list defaults to no.
   "Yes" matches what a phone user expects from mail; "no" makes a destructive
-  outermost action safer without a confirming handler. The recommendation is
-  yes, with `ListItemAction` offering no opt-out until a product needs one.
+  last action safer without a confirming handler. The recommendation is yes.
 
-- **OQ5 — Is the name `actionsReveal`, and are the values `always` / `adaptive`?** (`human-api`)
+- **OQ6 — One side or two on a coarse pointer?** (`human-design`)
 
-  `adaptive` is the system's word (DropdownMenuSubMenu `presentation`). The
-  alternative `actionsPresentation: 'visible' | 'adaptive'` aligns the prop
-  name with that precedent at the cost of a less direct word. The vibe test
-  ran with `actionsReveal`.
+  One `actions` list reveals at the row's end: a drag toward the inline
+  start. iOS Mail and Gmail also use the leading side for a second set
+  (archive on one side, delete on the other), and #6821 modelled both. The
+  recommendation is one side now — it is what the hover reveal has, it keeps
+  one list, and a leading side is additive later as a second array — but it
+  is a visible product difference the owner should rule on.
 
-- **OQ6 — Does a product need to open or close a row programmatically?** (`checkable`)
+- **OQ7 — Does a product need to open or close a row programmatically?** (`checkable`)
 
   Framework7 and Quasar expose `open`/`close`/`reset`; SwiftUI added
   `onPresentationChanged`. No Astryx product has asked. Left out of the
