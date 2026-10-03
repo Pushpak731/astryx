@@ -53,11 +53,9 @@ import {
   parseMarkdownAstIncremental,
   createIncrementalState,
   trimStreamingArtifacts,
-  slugify,
-  uniqueSlug,
 } from './parser';
 import type {IncrementalState, MathParseOptions, ParseOptions} from './parser';
-import {getMarkdownAstLegacyCodeLanguage, markdownAstText} from './ast';
+import {getMarkdownAstLegacyCodeLanguage} from './ast';
 import type {
   MarkdownAstBlockContent,
   MarkdownAstPhrasingContent,
@@ -77,6 +75,12 @@ import type {
   PreparedMarkdownPlugins,
 } from './plugins/protocol';
 import {sanitizeMarkdownLinkUrl, sanitizeMarkdownUrl} from './url';
+import {
+  projectMarkdownHeadings,
+  type MarkdownHeadingProjection,
+} from './headingProjection';
+import {markdownHeadingScope} from './markdownHeading.markers.stylex';
+import {Link} from '../Link/Link';
 import {themeProps} from '../utils/themeProps';
 import {useTranslator, type TranslatorFn} from '../i18n';
 
@@ -143,11 +147,10 @@ export interface MarkdownComponents {
     level: 1 | 2 | 3 | 4 | 5 | 6;
     children: React.ReactNode;
     /**
-     * Generated slug for this heading, matching the ids produced by
-     * useOutlineFromMarkdown / parseOutlineFromMarkdown. Render it as the
-     * element's `id` to keep Outline hash navigation working. Undefined for
-     * headings nested inside blockquotes or list items (the outline only
-     * lists top-level headings).
+     * Generated stable id for this heading, matching the shared depth-first
+     * allocator used by Markdown-derived Outline utilities. Every heading,
+     * including headings nested inside blockquotes or list items, receives one.
+     * Custom renderers own their output and should apply it to their heading.
      */
     id?: string;
   }>;
@@ -358,9 +361,39 @@ const styles = stylex.create({
     fontSize: 'inherit',
   },
   // Headings
+  headingRow: {
+    display: 'flex',
+    alignItems: 'baseline',
+    minWidth: 0,
+    maxWidth: '100%',
+  },
   headingBase: {
+    flex: '0 1 auto',
+    minWidth: 0,
     fontFamily: typographyVars['--font-family-heading'],
     color: colorVars['--color-text-primary'],
+  },
+  headingPermalink: {
+    flexShrink: 0,
+    marginInlineStart: spacingVars['--spacing-1'],
+    opacity: {
+      default: 1,
+      '@media (hover: hover) and (forced-colors: none)': 0,
+      ':focus-visible': 1,
+    },
+    transitionProperty: 'opacity',
+    transitionDuration: {
+      default: durationVars['--duration-fast'],
+      '@media (prefers-reduced-motion: reduce)': '0s',
+    },
+    transitionTimingFunction: easeVars['--ease-standard'],
+  },
+  headingPermalinkHover: {
+    opacity: {
+      [stylex.when.ancestor(':hover', markdownHeadingScope)]: {
+        '@media (hover: hover) and (forced-colors: none)': 1,
+      },
+    },
   },
   h1: {
     fontSize: typeScaleVars['--text-heading-1-size'],
@@ -1304,7 +1337,7 @@ function renderBlock(
   components: Partial<MarkdownComponents> | undefined,
   preparedPlugins: PreparedMarkdownPlugins | undefined,
   t: TranslatorFn,
-  headingIdMap?: ReadonlyMap<RenderBlockNode, string>,
+  headingProjection?: MarkdownHeadingProjection,
 ): SyncReactNode {
   const blockAlignMargin = BLOCK_ALIGN_MARGIN[contentAlign];
   const blockAlignStyle =
@@ -1332,11 +1365,8 @@ function renderBlock(
           preparedPlugins,
         ),
       );
-      // Only top-level headings get an id: the map is built from the same
-      // traversal parseOutlineFromMarkdown uses (which skips headings nested
-      // in blockquotes / list items), so rendered ids and outline ids stay
-      // identical — including duplicate-slug numbering.
-      const headingId = headingIdMap?.get(node);
+      const headingId = headingProjection?.ids.get(node);
+      const headingLabel = headingProjection?.labels.get(node) ?? '';
       const HeadingComp = components?.heading;
       if (HeadingComp) {
         return (
@@ -1347,27 +1377,49 @@ function renderBlock(
       }
       const Tag = `h${level}` as const;
       return (
-        <Tag
+        <div
           key={index}
-          id={headingId}
-          {...mergeProps(
-            themeProps('markdown-heading', {density, level}),
-            stylex.props(
-              styles.headingBase,
-              headingStyles[level],
-              spacing,
-              contentWidthValue != null
-                ? dynamicStyles.proseWidth(contentWidthValue)
-                : null,
-              contentAlign !== 'start'
-                ? dynamicStyles.proseAlign(ALIGN_MARGIN[contentAlign])
-                : null,
-              isFirst && styles.noMarginBlockStart,
-              isLast && styles.noMarginBlockEnd,
-            ),
+          {...stylex.props(
+            styles.headingRow,
+            markdownHeadingScope,
+            contentWidthValue != null
+              ? dynamicStyles.proseWidth(contentWidthValue)
+              : null,
+            contentAlign !== 'start'
+              ? dynamicStyles.proseAlign(ALIGN_MARGIN[contentAlign])
+              : null,
           )}>
-          {headingChildren}
-        </Tag>
+          <Tag
+            id={headingId}
+            {...mergeProps(
+              themeProps('markdown-heading', {density, level}),
+              stylex.props(
+                styles.headingBase,
+                headingStyles[level],
+                spacing,
+                isFirst && styles.noMarginBlockStart,
+                isLast && styles.noMarginBlockEnd,
+              ),
+            )}>
+            {headingChildren}
+          </Tag>
+          {headingId != null && (
+            <Link
+              as="a"
+              href={`#${headingId}`}
+              label={t('@astryx.markdown.headingPermalink', {
+                heading: headingLabel || headingId,
+              })}
+              type="inherit"
+              color="secondary"
+              {...stylex.props(
+                styles.headingPermalink,
+                styles.headingPermalinkHover,
+              )}>
+              #
+            </Link>
+          )}
+        </div>
       );
     }
     case 'paragraph': {
@@ -1517,6 +1569,7 @@ function renderBlock(
             components,
             preparedPlugins,
             t,
+            headingProjection,
           ),
         );
         return <BlockquoteComp key={index}>{bqC}</BlockquoteComp>;
@@ -1553,6 +1606,7 @@ function renderBlock(
               components,
               preparedPlugins,
               t,
+              headingProjection,
             ),
           )}
         </Blockquote>
@@ -1630,6 +1684,7 @@ function renderBlock(
                         components,
                         preparedPlugins,
                         t,
+                        headingProjection,
                       ),
                     )}
                   </>
@@ -1714,6 +1769,7 @@ function renderBlock(
                       components,
                       preparedPlugins,
                       t,
+                      headingProjection,
                     ),
                   )}
                 </>
@@ -1969,6 +2025,7 @@ export function Markdown<
   xstyle,
   className,
   style,
+  id: rootId,
   'data-testid': testId,
   ...props
 }: MarkdownProps<Plugins>): React.ReactElement {
@@ -2084,28 +2141,19 @@ export function Markdown<
     [parsedBlocks, preparedPlugins, transformSource, isStreaming],
   );
 
-  // Assign each top-level heading the slug that parseOutlineFromMarkdown
-  // would derive for it, so Outline hash links built from the same source
-  // always find a matching DOM id. Mirrors that function's traversal exactly:
-  // top-level blocks only, one shared duplicate-numbering sequence.
-  // NOTE: must stay above the `display === 'inline'` early return below —
-  // hooks cannot be conditional.
-  const headingIdMap = useMemo(() => {
+  // One depth-first projection owns every rendered heading id and the root-only
+  // Outline subset. It stays above the inline early return because hooks cannot
+  // be conditional. A supplied Markdown root id is the stable namespace.
+  const headingProjection = useMemo(() => {
     if (display === 'inline' || blocks.length === 0) {
       return undefined;
     }
-    const map = new Map<RenderBlockNode, string>();
-    const counts = new Map<string, number>();
-    for (const block of blocks) {
-      if (block.type === 'heading') {
-        const label = markdownAstText(block.children, node =>
-          markdownExtensionText(preparedPlugins, node),
-        ).trim();
-        map.set(block, uniqueSlug(slugify(label), counts));
-      }
-    }
-    return map;
-  }, [display, blocks, preparedPlugins]);
+    return projectMarkdownHeadings(
+      {type: 'root', children: blocks},
+      preparedPlugins,
+      rootId,
+    );
+  }, [display, blocks, preparedPlugins, rootId]);
 
   const parsedInlineNodes = useMemo(() => {
     if (display !== 'inline') {
@@ -2207,6 +2255,7 @@ export function Markdown<
         ref={ref}
         // Consumer props first: what the component sets for itself wins.
         {...props}
+        id={rootId}
         data-testid={testId}
         {...mergeProps(
           themeProps('markdown', {density}),
@@ -2243,6 +2292,7 @@ export function Markdown<
       // Consumer props first: what the component sets for itself — the
       // document role included — wins.
       {...props}
+      id={rootId}
       role="document"
       data-testid={testId}
       {...mergeProps(
@@ -2272,7 +2322,7 @@ export function Markdown<
           components,
           preparedPlugins,
           t,
-          headingIdMap,
+          headingProjection,
         ),
       )}
     </div>

@@ -28,8 +28,14 @@ export function useOutlineFromMarkdown<
 ): OutlineItem[] {
   const plugins = options?.plugins;
   const isFinal = options?.isFinal;
+  const headingIdPrefix = options?.headingIdPrefix;
   return useMemo(
-    () => parseOutlineFromMarkdown(markdown, {plugins, isFinal}),
-    [markdown, plugins, isFinal],
+    () =>
+      parseOutlineFromMarkdown(markdown, {
+        plugins,
+        isFinal,
+        headingIdPrefix,
+      }),
+    [markdown, plugins, isFinal, headingIdPrefix],
   );
 }

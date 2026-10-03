@@ -49,6 +49,38 @@ describe('parseOutlineFromMarkdown', () => {
     expect(outline.every(i => i.label === 'Setup')).toBe(true);
   });
 
+  it('reserves emitted ids across natural and numeric-suffix collisions', () => {
+    expect(
+      parseOutlineFromMarkdown(['# Foo', '# Foo', '# Foo-1'].join('\n\n')).map(
+        item => item.id,
+      ),
+    ).toEqual(['foo', 'foo-1', 'foo-1-1']);
+    expect(
+      parseOutlineFromMarkdown(['# Foo-1', '# Foo', '# Foo'].join('\n\n')).map(
+        item => item.id,
+      ),
+    ).toEqual(['foo-1', 'foo', 'foo-2']);
+  });
+
+  it('uses NFKC Unicode letters and numbers in ids', () => {
+    expect(
+      parseOutlineFromMarkdown('# Ｈｅｌｌｏ Привет 你好 😄 １２３')[0].id,
+    ).toBe('hello-привет-你好-123');
+  });
+
+  it('lets nested headings consume ids without adding them to the outline', () => {
+    const source = '> # Quoted\n\n# Quoted';
+    expect(parseOutlineFromMarkdown(source)).toEqual([
+      {id: 'quoted-1', label: 'Quoted', level: 1},
+    ]);
+  });
+
+  it('prefixes ids with the Markdown root id when requested', () => {
+    expect(
+      parseOutlineFromMarkdown('# Overview', {headingIdPrefix: 'article'}),
+    ).toEqual([{id: 'article--overview', label: 'Overview', level: 1}]);
+  });
+
   it('falls back to "section" when a heading slugifies to empty', () => {
     const outline = parseOutlineFromMarkdown(['# !!!', '# @@@'].join('\n\n'));
     expect(outline.map(i => i.id)).toEqual(['section', 'section-1']);

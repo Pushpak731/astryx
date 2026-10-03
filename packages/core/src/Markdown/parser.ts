@@ -3964,27 +3964,47 @@ function parseMarkdownIncrementalAstBlocks(
 // derives its item ids from the same functions, so outline hash links always
 // resolve to a rendered heading by construction.
 
-/** Turn heading text into a URL-safe slug (lowercase, hyphen-separated). */
+/**
+ * Turn heading text into a stable fragment slug.
+ *
+ * NFKC folds compatibility forms (for example full-width Latin and numbers),
+ * straight quotes disappear rather than opening gaps, Unicode letters and
+ * numbers are preserved, and every other run collapses to one hyphen.
+ */
 export function slugify(value: string): string {
   return value
+    .normalize('NFKC')
     .trim()
     .toLowerCase()
-    .replace(/['"]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
+    .replace(/['"]/gu, '')
+    .replace(/[^\p{Letter}\p{Number}]+/gu, '-')
+    .replace(/^-+|-+$/gu, '');
 }
 
 /**
- * Disambiguate repeated slugs with a numeric suffix (`setup`, `setup-1`, …).
- * Empty slugs fall back to `section`. The caller owns the counts map so one
- * document shares a single numbering sequence.
+ * Allocate one collision-free id (`setup`, `setup-1`, …) for a document.
+ * Empty slugs fall back to `section`. Every emitted id is reserved, including
+ * numeric-looking authored bases, so `foo`, duplicate `foo`, and `foo-1` can
+ * never produce duplicate DOM ids.
  */
 export function uniqueSlug(
   baseSlug: string,
   counts: Map<string, number>,
 ): string {
   const fallbackSlug = baseSlug || 'section';
-  const count = counts.get(fallbackSlug) ?? 0;
-  counts.set(fallbackSlug, count + 1);
-  return count === 0 ? fallbackSlug : `${fallbackSlug}-${count}`;
+  if (!counts.has(fallbackSlug)) {
+    counts.set(fallbackSlug, 0);
+    return fallbackSlug;
+  }
+
+  let suffix = counts.get(fallbackSlug) ?? 0;
+  let candidate: string;
+  do {
+    suffix += 1;
+    candidate = `${fallbackSlug}-${suffix}`;
+  } while (counts.has(candidate));
+
+  counts.set(fallbackSlug, suffix);
+  counts.set(candidate, 0);
+  return candidate;
 }

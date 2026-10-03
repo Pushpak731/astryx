@@ -11,16 +11,9 @@
  * - /packages/core/src/Outline/index.ts
  */
 
-import {
-  parseMarkdownAstInternal,
-  slugify,
-  uniqueSlug,
-} from '../Markdown/parser';
-import {markdownAstText} from '../Markdown/ast';
-import {
-  markdownExtensionText,
-  prepareMarkdownPlugins,
-} from '../Markdown/plugins/protocol';
+import {parseMarkdownAstInternal} from '../Markdown/parser';
+import {projectMarkdownHeadings} from '../Markdown/headingProjection';
+import {prepareMarkdownPlugins} from '../Markdown/plugins/protocol';
 import type {
   MarkdownExtensionNode,
   MarkdownPluginEntry,
@@ -41,6 +34,11 @@ export interface ParseOutlineFromMarkdownOptions<
   readonly plugins?: ReadonlyArray<MarkdownPluginEntry<Node>>;
   /** Match Markdown's transform finality while content is streaming. */
   readonly isFinal?: boolean;
+  /**
+   * Prefix generated ids with the same stable namespace as Markdown's root
+   * `id`. Omit it to preserve the released unprefixed fragments.
+   */
+  readonly headingIdPrefix?: string;
 }
 
 export function parseOutlineFromMarkdown<
@@ -53,21 +51,13 @@ export function parseOutlineFromMarkdown<
     options?.plugins == null
       ? undefined
       : prepareMarkdownPlugins(options.plugins);
-  const counts = new Map<string, number>();
-  return parseMarkdownAstInternal(
+  const root = parseMarkdownAstInternal(
     markdown,
     {plugins: options?.plugins},
     options?.isFinal ?? true,
-  )
-    .children.filter(block => block.type === 'heading')
-    .map(block => {
-      const label = markdownAstText(block.children, node =>
-        markdownExtensionText(prepared, node),
-      ).trim();
-      return {
-        id: uniqueSlug(slugify(label), counts),
-        label,
-        level: block.depth,
-      };
-    });
+  );
+  return [
+    ...projectMarkdownHeadings(root, prepared, options?.headingIdPrefix)
+      .outline,
+  ];
 }

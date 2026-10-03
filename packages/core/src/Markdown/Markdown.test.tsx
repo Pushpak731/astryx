@@ -17,6 +17,8 @@ import type {MarkdownComponents, MarkdownInlinePlugin} from './Markdown';
 import type {ParseOptions} from './index';
 import {stubMatchMedia} from '../__tests__/stubMatchMedia';
 import {parseOutlineFromMarkdown} from '../Outline/parseOutlineFromMarkdown';
+import {LinkProvider} from '../Link/LinkProvider';
+import {InternationalizationProvider} from '../i18n';
 import {spacingVars} from '../theme/tokens.stylex';
 
 const tableCellSpacingProbe = stylex.create({
@@ -116,18 +118,142 @@ describe('Markdown', () => {
       expect(received).toEqual(['overview', 'overview-1']);
     });
 
-    it('does not assign ids to headings nested inside blockquotes', () => {
-      // parseOutlineFromMarkdown only lists top-level headings. If nested
-      // headings consumed slugs too, duplicate numbering would drift and
-      // outline links would land on the wrong heading.
+    it('assigns ids to nested headings while keeping root outline links aligned', () => {
+      // Nested headings are linkable too. They share one depth-first allocator
+      // with root headings, while Outline keeps returning root headings only.
       const source = '> # Quoted\n\n# Quoted';
       const {container} = render(<Markdown>{source}</Markdown>);
       const outline = parseOutlineFromMarkdown(source);
-      expect(outline.map(i => i.id)).toEqual(['quoted']);
+      expect(outline.map(i => i.id)).toEqual(['quoted-1']);
       const [nested, topLevel] = screen.getAllByText('Quoted');
       expect(container.querySelector('blockquote')).toContainElement(nested);
-      expect(nested).not.toHaveAttribute('id');
-      expect(topLevel).toHaveAttribute('id', 'quoted');
+      expect(nested).toHaveAttribute('id', 'quoted');
+      expect(topLevel).toHaveAttribute('id', 'quoted-1');
+    });
+
+    it('reserves every emitted id across authored suffix collisions', () => {
+      render(<Markdown>{'# Foo\n\n# Foo\n\n# Foo-1'}</Markdown>);
+      expect(screen.getAllByRole('heading').map(heading => heading.id)).toEqual(
+        ['foo', 'foo-1', 'foo-1-1'],
+      );
+    });
+
+    it('normalizes Unicode letters and numbers while stripping emoji', () => {
+      render(<Markdown>{'# Ｈｅｌｌｏ Привет 你好 😄 １２３'}</Markdown>);
+      expect(screen.getByRole('heading')).toHaveAttribute(
+        'id',
+        'hello-привет-你好-123',
+      );
+    });
+
+    it('uses the Markdown root id as a stable heading namespace', () => {
+      const source = '# Overview\n\n## Details';
+      const {container} = render(<Markdown id="article">{source}</Markdown>);
+      expect(container.firstElementChild).toHaveAttribute('id', 'article');
+      expect(screen.getAllByRole('heading').map(heading => heading.id)).toEqual(
+        ['article--overview', 'article--details'],
+      );
+      expect(
+        parseOutlineFromMarkdown(source, {headingIdPrefix: 'article'}),
+      ).toEqual([
+        {id: 'article--overview', label: 'Overview', level: 1},
+        {id: 'article--details', label: 'Details', level: 2},
+      ]);
+    });
+  });
+
+  describe('heading permalinks', () => {
+    it('renders one native sibling permalink for every default heading', () => {
+      const {container} = render(
+        <Markdown>{'# Overview\n\n> ## Nested details'}</Markdown>,
+      );
+      const headings = screen.getAllByRole('heading');
+      expect(headings.map(heading => heading.id)).toEqual([
+        'overview',
+        'nested-details',
+      ]);
+      expect(
+        screen.getByRole('link', {name: 'Permalink to Overview'}),
+      ).toHaveAttribute('href', '#overview');
+      expect(
+        screen.getByRole('link', {name: 'Permalink to Nested details'}),
+      ).toHaveAttribute('href', '#nested-details');
+      for (const heading of headings) {
+        expect(heading).not.toContainElement(
+          container.querySelector(`a[href="#${heading.id}"]`),
+        );
+        expect(heading.parentElement).toContainElement(
+          container.querySelector(`a[href="#${heading.id}"]`),
+        );
+      }
+    });
+
+    it('keeps authored heading links valid instead of nesting anchors', () => {
+      const {container} = render(
+        <Markdown>{'# Read the [guide](https://example.com/guide)'}</Markdown>,
+      );
+      const heading = screen.getByRole('heading', {name: 'Read the guide'});
+      expect(heading.querySelectorAll('a')).toHaveLength(1);
+      expect(
+        heading.parentElement?.querySelectorAll(':scope > a'),
+      ).toHaveLength(1);
+      expect(container.querySelector('a a')).toBeNull();
+    });
+
+    it('bypasses product routing and Markdown link interception', () => {
+      const onLinkClick = vi.fn();
+      const ProviderLink = ({children, ...linkProps}: ComponentProps<'a'>) => (
+        <a data-provider-link {...linkProps}>
+          {children}
+        </a>
+      );
+      render(
+        <LinkProvider component={ProviderLink}>
+          <Markdown onLinkClick={onLinkClick}>{'# Overview'}</Markdown>
+        </LinkProvider>,
+      );
+      const permalink = screen.getByRole('link', {
+        name: 'Permalink to Overview',
+      });
+      expect(permalink.tagName).toBe('A');
+      expect(permalink).not.toHaveAttribute('data-provider-link');
+      fireEvent.click(permalink);
+      expect(onLinkClick).not.toHaveBeenCalled();
+    });
+
+    it('localizes the accessible permalink name', () => {
+      render(
+        <InternationalizationProvider
+          locale="fr"
+          overrides={{
+            fr: {
+              '@astryx.markdown.headingPermalink':
+                'Lien permanent vers {heading}',
+            },
+          }}>
+          <Markdown>{'# Aperçu'}</Markdown>
+        </InternationalizationProvider>,
+      );
+      expect(
+        screen.getByRole('link', {name: 'Lien permanent vers Aperçu'}),
+      ).toHaveAttribute('href', '#aperçu');
+    });
+
+    it('leaves permalink output to a custom heading renderer at every depth', () => {
+      const received: (string | undefined)[] = [];
+      render(
+        <Markdown
+          components={{
+            heading: ({children, id}: {children: ReactNode; id?: string}) => {
+              received.push(id);
+              return <h2 id={id}>{children}</h2>;
+            },
+          }}>
+          {'> # Nested\n\n# Root'}
+        </Markdown>,
+      );
+      expect(received).toEqual(['nested', 'root']);
+      expect(screen.queryByRole('link', {name: /Permalink to/})).toBeNull();
     });
   });
 

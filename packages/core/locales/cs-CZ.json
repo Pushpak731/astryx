@@ -523,6 +523,10 @@
     "defaultMessage": "{itemName} je již {boundary, select, first {na první pozici} last {na poslední pozici} other {}}.",
     "description": "Screen-reader-only live announcement when an arrow-key reorder attempt has no effect because the record is already at that end of the list. `{itemName}` is the consumer's singular noun for one record; `{boundary}` is always exactly \"first\" or \"last\"."
   },
+  "@astryx.markdown.headingPermalink": {
+    "defaultMessage": "Trvalý odkaz na {heading}",
+    "description": "Accessible name for the native fragment link beside a rendered Markdown heading. `{heading}` is the heading's plain text, or its generated id when the text is empty."
+  },
   "@astryx.markdown.taskList": {
     "defaultMessage": "Seznam úkolů",
     "description": "Screen-reader-only accessible name for a GitHub-flavored Markdown task list (rendered from `- [ ] item` / `- [x] done` syntax)."
