@@ -34,7 +34,8 @@ review_triggers: [public-api, accessibility, behavior]
       "FR10",
       "DEC-1",
       "DEC-3",
-      "DEC-4"
+      "DEC-4",
+      "DEC-6"
     ],
     "accessibility": ["AR1", "AR2", "AR3"],
     "behavior": ["FR4", "FR5", "FR6", "FR7", "FR8", "DEC-2", "DEC-5"]
@@ -50,7 +51,7 @@ review_triggers: [public-api, accessibility, behavior]
 | Behavior                | On a coarse pointer a sideways drag moves the row and uncovers the side's panel. Under `reveal` (default) the row rests open so each action is tappable and a long drag fires the outermost; under `commit` the row slides out and the outermost fires; nothing rests. After an action fires the row springs back, or holds out when the action has `hasRemoval` — one bit the component cannot infer, independent of the model. The component waits for nothing afterwards. A short release springs back under both. A mouse never starts the drag; a mostly vertical drag stays the scroller's; a pointer anywhere outside a resting row closes it. |
 | End-user impact         | A person on a phone gets the flick they expect on a mail row, a settings row, or a picker option, with the row's own look. Nothing changes for anyone else: a mouse, a keyboard, or a screen reader meets the row exactly as today.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Builder impact          | One prop on `Item` (and so on `ListItem`), `swipeActions={{trailing: [{label: 'Archive', icon: <Icon icon={ArchiveIcon} />, onActivate: archive, hasRemoval: true}]}}`; optionally `swipeBehavior`. Every field is known before the gesture begins, so the component paints the panel from data. The group around the rows clips in the inline axis — `List` does it; any other host does it once. The consumer documentation states that a verb reachable only by swipe is unreachable by keyboard.                                                                                                                                                  |
-| Compatibility/readiness | Additive: both props are absent by default; every current row keeps its DOM and paint exactly. Authority: `draft`; `approved_by` is `null`. Two owner questions are open; neither changes the public shape.                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Compatibility/readiness | Additive: both props are absent by default; every current row keeps its DOM and paint exactly. Authority: `draft`; `approved_by` is `null`. One owner question is open; it does not change the public shape.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | Review checks           | Reject a hover-revealed panel; `reveal` inside a `listbox`, `menu`, or `radiogroup`; `commit` with several entries on a side and no warning; a panel exposed to the tree while closed; any element added to `Item` for the panels; `overflow: hidden` on the group where `clip` is meant; a row exit or enter animation introduced under this record; `hasRemoval` read as an obligation, a warning, or a timing rule; a second adaptive media query.                                                                                                                                                                                                 |
 | Governing rules         | [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV6, INV7; [`spec:AST-002`](../AST-002/spec.md) FR1, FR4, FR15, FR16, `DEC-1`; [`architecture:public-component-api`](../../architecture/public-component-api.md) INV2, INV3, INV5.                                                                                                                                                                                                                                                                                                                                                                           |
 
@@ -140,7 +141,7 @@ row's own end content is the row's business, not this record's.
   panel positions are internal, rendered from `swipeActions`. A second
   consumer — an accent bar, a slide-in checkbox, a drag handle — is a
   `component:Item` anatomy record with its own admission argument.
-- **A programmatic open** (OQ2).
+- **A programmatic open** (OQ1).
 - **`reveal` inside menus, listboxes, radio groups.** Those roles cannot
   host a panel of buttons under ARIA; `commit` may run there (DEC-3).
 - Equivalent internal implementations remain valid when they satisfy this
@@ -194,7 +195,7 @@ row's own end content is the row's business, not this record's.
 | ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------------- | --------- |
 | `Item.swipeActions`      | `{leading?: ItemSwipeAction[]; trailing?: ItemSwipeAction[]}`                                                                                                           | The verbs a sideways drag uncovers on each side, outermost last. `leading` is uncovered by a drag toward the inline end, `trailing` by one toward the inline start. Inherited by `ListItem` and every host that renders an `Item`.                                                                                                                                                                                                                               | absent   | `spec:AST-057`              | proposed  |
 | `ItemSwipeAction`        | `{id?: string; label: string; icon?: ReactNode; onActivate: () => void \| Promise<void>; isDisabled?: boolean; variant?: ItemSwipeActionVariant; hasRemoval?: boolean}` | One verb. `Item` renders it as a filled surface in its `variant`'s colour with the icon above the label; `label` is the button's accessible name under `reveal` and names the **state** the verb reaches ("Unread"). Every field is known before the gesture begins.                                                                                                                                                                                             | —        | `spec:AST-057`              | proposed  |
-| `ItemSwipeActionVariant` | `'neutral'` \| `'accent'` \| `'destructive'`                                                                                                                            | How the action looks: ordinary, the one you mean, the dangerous one. Not a status set — a verb is not a state. New vocabulary (OQ1).                                                                                                                                                                                                                                                                                                                             | `accent` | `spec:AST-057`              | proposed  |
+| `ItemSwipeActionVariant` | `'neutral'` \| `'accent'` \| `'destructive'`                                                                                                                            | How the action looks: ordinary, the one you mean, the dangerous one. Not a status set — a verb is not a state. Minted here (DEC-6).                                                                                                                                                                                                                                                                                                                              | `accent` | `spec:AST-057`              | proposed  |
 | `hasRemoval`             | `false`, `true`                                                                                                                                                         | After this action activates, the row holds out rather than springing back. Only that: not a promise the caller removes the row, not an animation, not a timing rule. Independent of `swipeBehavior` and of `variant`; all combinations occur.                                                                                                                                                                                                                    | `false`  | `spec:AST-057`              | proposed  |
 | `onActivate`             | called on tap of a resting panel, on the full-swipe accelerator, and on a `commit` release                                                                              | Core's word for a verb firing by any path. Not `onClick`: a commit fires with no click. Fires at activation.                                                                                                                                                                                                                                                                                                                                                     | —        | `spec:AST-057`              | proposed  |
 | `Item.swipeBehavior`     | `'reveal'` \| `'commit'`                                                                                                                                                | `reveal`: past the panel's width the row rests open with every entry a real button; a long drag or fling fires the outermost. `commit`: a release past the commit point slides the row out and fires the outermost entry; nothing rests; the panel is presentational; valid for one entry per side, warns with more. A commit is not a removal: the row springs back unless the entry has `hasRemoval`. "Swipe to activate" is `commit` with the row's own verb. | `reveal` | `spec:AST-057`              | proposed  |
@@ -327,11 +328,8 @@ for child components or a render prop.
 
 The vocabulary: `onActivate` is core's word for a row's verb firing by a
 path that is not a click (`useMenuPress`, `useTreeFocus`, `Selector`,
-`TreeList`), and a commit fires on release with no click at all. `variant`
-is `'neutral' | 'accent' | 'destructive'` — three flavours of verb, not a
-status set, because a verb is not a state; `accent` is the default because
-a swipe panel is a filled surface that has to be some colour, and
-`ProgressBar` already defaults a filled surface to `accent`. `label` names the state the verb reaches ("Unread"), because the panel
+`TreeList`), and a commit fires on release with no click at all. `variant` is
+`'neutral' | 'accent' | 'destructive'`, with `accent` the default (DEC-6). `label` names the state the verb reaches ("Unread"), because the panel
 shares one row width with the title it uncovers and the gesture already
 supplies the verb. `hasRemoval` is one bit the component cannot infer: after
 the action fires, does the row spring back or hold out? It is independent of
@@ -457,21 +455,36 @@ instead of a compositor transform. Rejected: public `beforeContent` /
 `afterContent` slots — nothing in this record needs them, and general
 anatomy takes its own admission.
 
+### DEC-6 — The verb variant set is `neutral | accent | destructive`, minted knowingly
+
+**Reference:** `spec:AST-057/DEC-6`
+**Decider:** `cixzhang`, `2026-10-02`
+
+`ItemSwipeActionVariant` is `'neutral' | 'accent' | 'destructive'`: three
+flavours of verb — ordinary, the one you mean, the dangerous one — and
+`accent` is the default on a swipe panel, because the panel is a filled
+surface that has to be some colour and `ProgressBar` already defaults a
+filled surface to `accent`.
+
+This is minted vocabulary, not reuse, and it was taken knowing that:
+`accent` appears on no other variant enum in core except `ProgressBar`'s
+default, and `Step.status` carries it as a status. The shared status set —
+`success | warning | error` across seven components — names states, and a
+verb is not a state: "Archive" is not a success and "Delete" is not an
+error. `spec:AST-058` takes the same set for picker-row actions with
+`neutral` as its default, so the vocabulary is one across the two surfaces
+where a verb gets a colour.
+
+Rejected: the status set — it would make a verb claim a state. Rejected:
+#6821's `tone: 'accent' | 'success' | 'warning' | 'error'` — a status set
+with one decorative member. Rejected: `Badge`'s variant map — it carries
+decorative colours (`blue`, `cyan`, …) that a verb slot must not admit.
+Rejected: the menu row's two-value `'default' | 'destructive'` — it has no
+word for the one action a panel exists to offer.
+
 ## Open questions
 
-- **OQ1 — Is the three-value verb `variant` minted knowingly, and does `accent` default under `reveal` too?** (`human-design`)
-
-  `'neutral' | 'accent' | 'destructive'` is new vocabulary, not reuse:
-  `'accent'` appears on no variant enum in core except `ProgressBar`'s
-  default, and `Step.status` carries it as a status, not a variant. This
-  record introduces the set. It is defensible — a verb is not a
-  state, and the shared status set names states — but it is minted here.
-  Separately: a lone `commit` panel wants the accent; three resting buttons
-  all in accent may want the ordinary one with `accent` on the one that
-  matters. The recommendation is `accent` everywhere, as directed, with the
-  caller choosing `neutral` for the others.
-
-- **OQ2 — Does a product need to open or close a row programmatically?** (`checkable`)
+- **OQ1 — Does a product need to open or close a row programmatically?** (`checkable`)
 
   Framework7 and Quasar expose `open`/`close`/`reset`; SwiftUI added
   `onPresentationChanged`. No Astryx product has asked. A controlled pair
