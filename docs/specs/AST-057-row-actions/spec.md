@@ -51,7 +51,7 @@ review_triggers: [public-api, accessibility, behavior]
 | Behavior                | On a coarse pointer a sideways drag moves the row and uncovers the side's panel. Under `reveal` (default) the row rests open so each action is tappable and a long drag fires the outermost; under `commit` the row slides out and the outermost fires; nothing rests. After an action fires the row springs back, or holds out when the action has `hasRemoval` — one bit the component cannot infer, independent of the model. The component waits for nothing afterwards. A short release springs back under both. A mouse never starts the drag; a mostly vertical drag stays the scroller's; a pointer anywhere outside a resting row closes it. |
 | End-user impact         | A person on a phone gets the flick they expect on a mail row, a settings row, or a picker option, with the row's own look. Nothing changes for anyone else: a mouse, a keyboard, or a screen reader meets the row exactly as today.                                                                                                                                                                                                                                                                                                                                                                                                                   |
 | Builder impact          | One prop on `Item` (and so on `ListItem`), `swipeActions={{trailing: [{label: 'Archive', icon: <Icon icon={ArchiveIcon} />, onActivate: archive, hasRemoval: true}]}}`; optionally `swipeBehavior`. Every field is known before the gesture begins, so the component paints the panel from data. The group around the rows clips in the inline axis — `List` does it; any other host does it once. The consumer documentation states that a verb reachable only by swipe is unreachable by keyboard.                                                                                                                                                  |
-| Compatibility/readiness | Additive: both props are absent by default; every current row keeps its DOM and paint exactly. Authority: `draft`; `approved_by` is `null`. One owner question is open; it does not change the public shape.                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| Compatibility/readiness | Additive: both props are absent by default; every current row keeps its DOM and paint exactly. Authority: `draft`; `approved_by` is `null`. No owner question is open.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Review checks           | Reject a hover-revealed panel; `reveal` inside a `listbox`, `menu`, or `radiogroup`; `commit` with several entries on a side and no warning; a panel exposed to the tree while closed; any element added to `Item` for the panels; `overflow: hidden` on the group where `clip` is meant; a row exit or enter animation introduced under this record; `hasRemoval` read as an obligation, a warning, or a timing rule; a second adaptive media query.                                                                                                                                                                                                 |
 | Governing rules         | [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV6, INV7; [`spec:AST-002`](../AST-002/spec.md) FR1, FR4, FR15, FR16, `DEC-1`; [`architecture:public-component-api`](../../architecture/public-component-api.md) INV2, INV3, INV5.                                                                                                                                                                                                                                                                                                                                                                           |
 
@@ -141,7 +141,12 @@ row's own end content is the row's business, not this record's.
   panel positions are internal, rendered from `swipeActions`. A second
   consumer — an accent bar, a slide-in checkbox, a drag handle — is a
   `component:Item` anatomy record with its own admission argument.
-- **A programmatic open** (OQ1).
+- **A programmatic open or close.** Not admitted: a swipe panel's open state
+  belongs to the gesture, and the one coordination case met in practice — a
+  resting row closing when a neighbour's drag starts — is already a pointer
+  outside the row (FR7). No product has asked; the source product exposes no
+  such handle. If one ever does, `handleRef` is the established pattern to add
+  it with, as `Selector` and `MultiSelector` expose open/close/toggle.
 - **`reveal` inside menus, listboxes, radio groups.** Those roles cannot
   host a panel of buttons under ARIA; `commit` may run there (DEC-3).
 - Equivalent internal implementations remain valid when they satisfy this
@@ -398,9 +403,10 @@ the owner drew on 2026-10-02 for per-row actions in `MultiSelector`), and
 so it runs anywhere, which is what makes swipe-to-activate an option valid.
 
 Rejected: a prop on `ListItem` alone — the gesture is not list-specific, and
-`ListItem` does not own the root. Rejected: a behavior hook that hosts
-compose — one-open-at-a-time was its reason to exist as group state, and
-outside-close gives the same outcome with nothing shared.
+`ListItem` does not own the root. Rejected: a behavior hook that hosts compose — one-open-at-a-time was its
+reason to exist as group state, and outside-close gives the same outcome
+with nothing shared. Rejected: an imperative or controlled open — nothing
+has asked, and the gesture already owns the one coordination case.
 
 ### DEC-4 — No hover reveal
 
@@ -484,11 +490,7 @@ word for the one action a panel exists to offer.
 
 ## Open questions
 
-- **OQ1 — Does a product need to open or close a row programmatically?** (`checkable`)
-
-  Framework7 and Quasar expose `open`/`close`/`reset`; SwiftUI added
-  `onPresentationChanged`. No Astryx product has asked. A controlled pair
-  would be the additive shape.
+None.
 
 ## Content boundary
 
