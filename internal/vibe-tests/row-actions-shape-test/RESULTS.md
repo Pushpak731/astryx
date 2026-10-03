@@ -136,10 +136,10 @@ the menu item vocabulary rather than a four-tone enum (OQ for the owner).
 - Arm C's doc was reconstructed from #6821's `.doc.mjs` text on `ListItem`
   rather than `Item`, to hold the host constant.
 - No implementation exists; every stub is a type the record proposes.
-- The arms were props on `ListItem`. The record has since moved the capability
-  to a hook (`useSwipeActions`) with `ListItem` as a thin shell, and dropped
-  the hover reveal the arm docs described. The data-vs-slot finding transfers
-  to the hook's options; hook-vs-prop discoverability was not measured.
+- The arms were props on `ListItem` documenting a hover reveal. The record
+  has since settled on `Item.swipeActions` (data per side, no hover reveal,
+  `Item` inherits to `ListItem`). The data-vs-slot finding transfers; the
+  keyboard-path scores assumed a hover reveal and do not.
 
 ## 6. Files
 
