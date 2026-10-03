@@ -14,7 +14,7 @@ affects_architecture:
   [architecture:interaction-modality, architecture:public-component-api]
 affects_families: []
 affects_contributing: [contributing:api-conventions]
-affects_consumer_docs: [Item, List, ListItem, MoreMenu]
+affects_consumer_docs: [Item, List, ListItem]
 review_triggers: [public-api, accessibility, behavior]
 ---
 
@@ -33,106 +33,109 @@ review_triggers: [public-api, accessibility, behavior]
       "FR9",
       "FR10",
       "DEC-1",
-      "DEC-2",
-      "DEC-4",
-      "DEC-5"
+      "DEC-3",
+      "DEC-4"
     ],
-    "accessibility": ["AR1", "AR2", "AR3", "AR4"],
-    "behavior": ["FR4", "FR5", "FR6", "FR7", "FR8", "DEC-3", "DEC-6"]
+    "accessibility": ["AR1", "AR2", "AR3"],
+    "behavior": ["FR4", "FR5", "FR6", "FR7", "FR8", "DEC-2", "DEC-5"]
   }
 }
 ```
 
 ## Contract at a glance
 
-| Area                    | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Public contract         | `Item` carries touch swipe actions. `swipeActions` declares, per side, the verbs a sideways drag reaches as `ItemSwipeAction[]` — data in the menu-row vocabulary (DEC-1). The verbs are an accelerator over ones the row already exposes through a visible control (DEC-2). `swipeBehavior` is `reveal` (rest open) or `commit` (fire on release) (DEC-3). The capability is `Item`'s because only the component owning the root can move it (DEC-4); `ListItem` inherits it. There is no hover reveal (DEC-5). The row's existing root translates and its panels counter-translate; no element is added to any row (DEC-6). |
-| Behavior                | On a coarse pointer a sideways drag moves the row and uncovers a panel naming the state each action reaches. Under `reveal` (default) the row rests open so each is tappable and a long drag fires the outermost; under `commit` the outermost fires on release and nothing rests. A short release springs back; after an action fires the row springs back. A mouse never starts the drag; a mostly vertical drag stays the scroller's; a pointer landing anywhere else closes a resting row, so one row rests open at a time with no shared state.                                                                          |
-| End-user impact         | A person on a phone gets the flick they expect on a mail row, a settings row, or a picker option; a person at a laptop uses the control the row already shows; a keyboard or screen-reader user reaches every verb through that control, because the swipe never carries a verb the row lacks.                                                                                                                                                                                                                                                                                                                                |
-| Builder impact          | One prop on `Item` (and so on `ListItem`), `swipeActions={{trailing: [...]}}`, in the shape `MoreMenu.items` already takes; optionally `swipeBehavior`. The group around the rows clips in the inline axis — `List` does it; a bare `Item` host does it once. No gesture code, no media queries, no wrapper. Obligation, checked in development: a row with swipe actions carries another interactive control.                                                                                                                                                                                                                |
-| Compatibility/readiness | Additive: both props are absent by default; every current row keeps its DOM and paint exactly. Authority: `draft`; `approved_by` is `null`. Six owner questions are open; OQ1–OQ3 change the public shape, OQ4–OQ6 do not.                                                                                                                                                                                                                                                                                                                                                                                                    |
-| Review checks           | Reject a swipe that is the only path to a verb; a hover-revealed copy of a row's controls; `reveal` inside a `listbox`, `menu`, or `radiogroup`; `commit` with several entries on a side and no warning; a panel exposed to the tree while closed; any element added to `Item` for the panels; `overflow: hidden` on the group where `clip` is meant; a second adaptive media query.                                                                                                                                                                                                                                          |
-| Governing rules         | [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV6, INV7; [`spec:AST-002`](../AST-002/spec.md) FR1, FR4, FR15, FR16, `DEC-1`; [`architecture:public-component-api`](../../architecture/public-component-api.md) INV2, INV3, INV5; `component:DropdownMenu` for the item-data vocabulary this record reuses.                                                                                                                                                                                                                                                                         |
+| Area                    | Contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Public contract         | `Item` carries touch swipe actions. `swipeActions` declares, per side, the verbs a sideways drag uncovers as `ItemSwipeAction[]` — `label`, `icon`, `onActivate`, `variant`, `hasRemoval` — and `Item` renders the panel from them (DEC-1). `swipeBehavior` is `reveal` (rest open) or `commit` (fire on release) (DEC-2). The capability is `Item`'s; `ListItem` inherits it (DEC-3). No hover reveal (DEC-4). No new DOM: the row's root translates and its panels counter-translate (DEC-5).                                                                                                                             |
+| Behavior                | On a coarse pointer a sideways drag moves the row and uncovers the side's panel. Under `reveal` (default) the row rests open so each action is tappable and a long drag fires the outermost; under `commit` the outermost fires on release and nothing rests. A short release springs back. After an action fires the row springs back wearing its new state; a `hasRemoval` action slides the row out instead, fires `onActivate` once the exit completes, and the caller removes the row. A mouse never starts the drag; a mostly vertical drag stays the scroller's; a pointer anywhere outside a resting row closes it. |
+| End-user impact         | A person on a phone gets the flick they expect on a mail row, a settings row, or a picker option, with the row's own look, and an archived row leaves instead of bouncing back and vanishing. Nothing changes for anyone else: a mouse, a keyboard, or a screen reader meets the row exactly as today.                                                                                                                                                                                                                                                                                                                      |
+| Builder impact          | One prop on `Item` (and so on `ListItem`), `swipeActions={{trailing: [{label: 'Archive', icon: <Icon icon={ArchiveIcon} />, onActivate: archive, hasRemoval: true}]}}`; optionally `swipeBehavior`. Every field is known before the gesture begins, so the component picks the right animation up front. The group around the rows clips in the inline axis — `List` does it; any other host does it once. The consumer documentation states that a verb reachable only by swipe is unreachable by keyboard.                                                                                                                |
+| Compatibility/readiness | Additive: both props are absent by default; every current row keeps its DOM and paint exactly. Authority: `draft`; `approved_by` is `null`. Three owner questions are open; OQ1 changes the public shape, OQ2–OQ3 do not.                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Review checks           | Reject a hover-revealed panel; `reveal` inside a `listbox`, `menu`, or `radiogroup`; `commit` with several entries on a side and no warning; a panel exposed to the tree while closed; any element added to `Item` for the panels; `overflow: hidden` on the group where `clip` is meant; `onActivate` firing before a `hasRemoval` exit completes; a `hasRemoval` row springing back; a second adaptive media query.                                                                                                                                                                                                       |
+| Governing rules         | [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV6, INV7; [`spec:AST-002`](../AST-002/spec.md) FR1, FR4, FR15, FR16, `DEC-1`; [`architecture:public-component-api`](../../architecture/public-component-api.md) INV2, INV3, INV5.                                                                                                                                                                                                                                                                                                                                                 |
 
 This table is a review projection; the body below is authoritative.
 
 ## Intent
 
-A row often has a verb or two beyond its primary: archive, delete, pin, mark
-read, select. On a phone the person flicks it sideways. At a laptop, and with
-a keyboard or a screen reader, the row carries those verbs somewhere visible
-and reachable — an overflow menu at its end, or its own selection. One set
-of verbs, two surfaces.
+On a phone, a person flicks a row sideways to get at a verb — archive,
+delete, mark unread, select. Astryx rows do not flick. This record adds the
+gesture to `Item`, the shared row, so a mail row, a settings row, and a
+picker option all swipe the same way, and so `ListItem` and every other host
+that renders an `Item` inherit it without declaring anything.
 
-Astryx has the surfaces and not the flick. This record adds the flick to
-`Item`, the shared row, as what it is in the product that first built it: a
-touch accelerator over verbs the row already acts through, declared in the
-menu's own vocabulary so a swipe and a menu item cannot reach different
-state. The row's own root moves and its panels stay put, so nothing is added
-to any row's DOM. `ListItem` inherits it; so does any host that renders an
-`Item`.
+The gesture is touch-only and is an accelerator: it adds a faster path to a
+verb on a coarse pointer and changes nothing on any other input. Each side's
+verbs are declared as data — a label that names the state the verb reaches,
+an icon, a handler, how it looks, and whether the row leaves — so the
+component knows everything it needs before the finger moves: what to paint,
+what to fire, and which animation ends the gesture. The row's own root moves
+and its panels stay put, so no element is added to any row.
 
 The trigger is [#6821](https://github.com/facebook/astryx/pull/6821), a port
-of that product's mail row. The owner's direction on reading it: the prop is
-swipe actions only and the desktop counterpart is the menu; both rest-open
-and fire-on-release are wanted; swipe-to-activate an option is in scope; no
-new container DOM.
+of a shipping product's mail row. The owner's direction on reading it: swipe
+actions only, scoped to mobile; both rest-open and fire-on-release; swipe to
+activate an option in scope; declared data rather than nodes, because a
+removal must be known up front; no new container DOM; no public slots; the
+row's own end content is the row's business, not this record's.
 
 ## Ownership boundary
 
 **Owns**
 
-- That `Item`'s swipe actions are declared once, per side, as data in the
-  menu-row vocabulary, and are an accelerator over verbs the row already
-  exposes through a visible control.
+- The public shape of `Item`'s swipe actions: `ItemSwipeAction` and its
+  fields, the per-side arrays, and `swipeBehavior`.
 - The two models, `reveal` and `commit`, and which hosts each may run in.
-- The coarse-pointer behavior: rest or fire, the accelerator, spring-back,
-  one open row at a time, and how a row closes.
+- The coarse-pointer behavior: rest or fire, the accelerator, spring-back or
+  slide-out, the three-way ownership of a removal, one open row at a time,
+  and how a row closes.
 - The anatomy the gesture uses: two out-of-flow positions on `Item`'s
   existing root, the root's translation and the panels' counter-translation,
   and the group's inline clip.
-- The accessibility floor: the swipe is never the only path; the panel is
-  real buttons while resting and out of the tree while closed.
-- That no hover reveal is added for these verbs.
+- The accessibility contract of the gesture itself: what the panel exposes
+  while resting and while closed, and that the gesture touches nothing on a
+  pointer that can hover.
 
 **Why no existing record can hold it**
 
 - [`architecture:interaction-modality`](../../architecture/interaction-modality.md)
-  is `current` and owns the rule this record applies — INV7 "essential
-  actions remain reachable" in every modality — but owns no public API that
-  satisfies it. A record carries one `authority` value, so adding unapproved
-  API claims to it would present them as approved
-  (`architecture:knowledge-contracts` INV1, INV14).
+  is `current` and owns the rule the gesture must respect — INV7 "essential
+  actions remain reachable" — but owns no public API. A record carries one
+  `authority` value, so adding unapproved API claims to it would present
+  them as approved (`architecture:knowledge-contracts` INV1, INV14).
 - `Item` has no component record. This record is the first durable decision
   about `Item`'s public surface; `component:Item`, when written, inherits
   these claims rather than re-deciding them.
 - [`component:List`](../../../packages/core/src/List/List.spec.md) is
   `current` and owns List's geometry; it gains the inline clip and cites
   this record.
-- `component:DropdownMenu` owns `DropdownMenuItemData`; this record reuses
-  that vocabulary and does not change it.
 - [`spec:AST-002`](../AST-002/spec.md) owns admission: the caller owns which
-  verbs earn a gesture and which model fits them, and the component cannot
-  derive either.
+  verbs earn a gesture, which model fits them, and which remove the row, and
+  the component cannot derive any of it.
 
 ## Non-goals
 
-- **A hover-revealed action panel on a fine pointer.** A product that wants
-  verbs visible composes a `MoreMenu` or buttons into `endContent`, as
-  today (DEC-5).
+- **What else the row offers.** A row's visible controls — a menu or buttons
+  in `endContent`, its own primary — are `Item`'s existing composition and
+  are not governed, paired, or checked here. The consumer documentation
+  states the obligation; the component does not police it.
+- **A hover-revealed action panel on a fine pointer** (DEC-4).
+- **A render prop for a custom panel.** Deferred, not foreclosed: a
+  `render*`-shaped addition can land when a caller needs something the
+  vocabulary cannot say (DEC-1).
 - **Gesture tuning.** Axis-lock distance, commit ratio, fling velocity, slide
   and spring durations, resistance past the panel: behavior constants in
   source, not public API and not design tokens (the same ruling the touch
   press model received for its clocks).
 - **Vertical swipes**, two-finger trackpad swipes, and a swipe whose only
   meaning is dismissal (Toast already has that in `useToastGesture`).
-- **A programmatic open** (OQ6).
-- **General out-of-flow slots on `Item`** — accent bars, slide-in
-  checkboxes, drag handles. The panel positions this record uses are
-  anatomy; whether they become public slots is OQ3.
+- **Public out-of-flow slots on `Item`.** Deliberately not admitted: the
+  panel positions are internal, rendered from `swipeActions`. A second
+  consumer — an accent bar, a slide-in checkbox, a drag handle — is a
+  `component:Item` anatomy record with its own admission argument.
+- **A programmatic open** (OQ3).
 - **`reveal` inside menus, listboxes, radio groups.** Those roles cannot
-  host a panel of buttons under ARIA; `commit` may run there (DEC-4).
+  host a panel of buttons under ARIA; `commit` may run there (DEC-3).
 - Equivalent internal implementations remain valid when they satisfy this
   contract. Internal modules, files, function names, algorithms, data
   structures, storage layouts, manifests, journals, locks, transaction
@@ -142,51 +145,57 @@ new container DOM.
 
 ## Evidence: in the repository
 
-| Where                                                                                                                                                                                              | What it shows                                                                                                                                                                                                                                                                                                            |
-| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| [`architecture:interaction-modality`](../../architecture/interaction-modality.md) INV4, INV7                                                                                                       | "Hover is never the only discovery or activation path." "Every supported modality has a perceivable and operable path" to an essential action. A swipe-only panel with a documented obligation fails INV7 by construction.                                                                                               |
-| `DropdownMenu.items: DropdownMenuOption[]`, `MoreMenu.items`, `DropdownMenuItemData`                                                                                                               | Core already declares verbs as data: `{id?, label, icon, onClick, isDisabled, variant: 'default' \| 'destructive', …}`, and data mode "renders through `DropdownMenuItem`, so the two APIs describe the same thing and must not drift". The vocabulary `ItemSwipeAction` takes.                                          |
-| `Item.endContent` doc: "badges, metadata, timestamps, or action buttons"; `SideNavItem.actions?: ReactNode`                                                                                        | Row actions are built today by composing controls into `endContent`, always visible. That is the permanent surface this record keeps.                                                                                                                                                                                    |
-| `Item`'s root: `position: relative`, `borderRadius`, `paddingInline`; no `overflow`, `isolation`, or `z-index`; the focus-within outline is painted on this root; `themeProps('item')` lands on it | The root is already a containing block for absolutely positioned children, and transforming it moves its outline and its theme target with it — nothing on it fights a `transform`. Only the component that owns this element can translate it.                                                                          |
-| `Item`'s content: `marker`, a `startContent` span, the label element (a span, an anchor in `href` mode, a `<button>` in `onClick` mode), an `endContent` span — four siblings in every render mode | Nothing can move four siblings as one unit except a common parent. The root is that parent already.                                                                                                                                                                                                                      |
-| `ListItem` renders `<Item as="li">` directly under `List`'s `<ul role="list">`                                                                                                                     | Any wrapper around the row is a non-`li` child of `<ul>`: invalid HTML and a broken "list, N items" announcement. The gesture has to live on `Item`.                                                                                                                                                                     |
-| `List`'s root sets no `overflow`                                                                                                                                                                   | A translated row paints past the list's inline edge unless the group clips. `overflow-inline: clip` clips without creating a scroll container; `hidden` would create one and fight the list's vertical scroller.                                                                                                         |
-| `useToastGesture` drives Toast's slide by writing `--_toast-swipe-y` onto the root with `style.setProperty`; Toast's styles consume it in `transform`                                              | The in-core way a gesture moves a component without re-rendering it: a custom property on the root, read by CSS. The swipe follows the same route.                                                                                                                                                                       |
-| The AppShell/Field ruling of 2026-09-04: a `z-index` adjustment stays local inside an `isolation: isolate` container                                                                               | The panel must paint above the root's background and below its content; `isolation: isolate` on the root with the panel at `z-index: -1` does that without reaching outside the row.                                                                                                                                     |
-| `Item` consumers: `DropdownMenuItem`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioItem`, `DropdownMenuSubMenu`, `SelectorOption`, `RadioListItem`, `ListItem`                                    | Five of seven hosts render `Item` with a `menuitem`, `option`, or radio role, where a resting panel of buttons is invalid ARIA; a presentational panel that fires on release is not. That is the line between `reveal` and `commit` (DEC-4), the boundary the owner drew on 2026-10-02 for per-row actions in a listbox. |
-| `Toast/useToastGesture.ts`                                                                                                                                                                         | A shipped commit-only swipe whose one meaning is dismissal, with constants (`SWIPE_DISMISS_RATIO`) in source.                                                                                                                                                                                                            |
-| #6821 real-device feedback                                                                                                                                                                         | On an iOS device the swipe required a press-and-hold before it would start, and the row background did not restore until release. The gesture craft is not yet settled on a device.                                                                                                                                      |
-| The source product's row (#6821 is its port)                                                                                                                                                       | Carries the `…` menu in `endContent` on every row and a touch-only swipe whose verbs are the menu's handlers. Its panel names the **state** ("Unread") where the menu names the sentence ("Mark as unread"). A toggle swipes back; a removal swipes out; a verb with no single instant opens a chooser.                  |
+| Where                                                                                                                                                                                              | What it shows                                                                                                                                                                                                                                                    |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Item`'s root: `position: relative`, `borderRadius`, `paddingInline`; no `overflow`, `isolation`, or `z-index`; the focus-within outline is painted on this root; `themeProps('item')` lands on it | The root is already a containing block for absolutely positioned children, and transforming it moves its outline and its theme target with it — nothing on it fights a `transform`. Only the component that owns this element can translate it.                  |
+| `Item`'s content: `marker`, a `startContent` span, the label element (a span, an anchor in `href` mode, a `<button>` in `onClick` mode), an `endContent` span — four siblings in every render mode | Nothing can move four siblings as one unit except a common parent. The root is that parent already.                                                                                                                                                              |
+| `ListItem` renders `<Item as="li">` directly under `List`'s `<ul role="list">`                                                                                                                     | Any wrapper around the row is a non-`li` child of `<ul>`: invalid HTML and a broken "list, N items" announcement. The gesture has to live on `Item`.                                                                                                             |
+| `List`'s root sets no `overflow`                                                                                                                                                                   | A translated row paints past the list's inline edge unless the group clips. `overflow-inline: clip` clips without creating a scroll container; `hidden` would create one and fight the list's vertical scroller.                                                 |
+| `useToastGesture` drives Toast's slide by writing `--_toast-swipe-y` onto the root with `style.setProperty`; Toast's styles consume it in `transform`                                              | The in-core way a gesture moves a component without re-rendering it: a custom property on the root, read by CSS.                                                                                                                                                 |
+| The AppShell/Field ruling of 2026-09-04: a `z-index` adjustment stays local inside an `isolation: isolate` container                                                                               | The panel must paint above the root's background and below its content; `isolation: isolate` on the root with the panel at `z-index: -1` does that without reaching outside the row.                                                                             |
+| `DropdownMenu.items`, `MoreMenu.items`, `DropdownMenuItemData`                                                                                                                                     | Core already declares a verb as data — a label, an icon, a handler, `isDisabled`, a `variant` — and data mode "renders through `DropdownMenuItem`, so the two APIs describe the same thing". `ItemSwipeAction` is that shape with the gesture's two extra facts. |
+| `useMenuPress.onActivate(row, release)`, `useTreeFocus.onActivate`, `Selector` and `TreeList` wiring                                                                                               | Core's word for "this row's verb fired" when the path is a release, a key, or a pointer and not a click. A commit fires on release with no click at all.                                                                                                         |
+| `hasSearch`, `hasCreate`, `hasPaging`, `hasHomeEnd` vs `isLoading`, `isOpen`, `isDisabled`                                                                                                         | Core's two boolean prefixes: `has*` declares that a thing has a capability; `is*` names a state it is currently in. A declaration of what activation will do is `has*`.                                                                                          |
+| `ProgressBar.variant` defaults to `'accent'`                                                                                                                                                       | In-core precedent for `accent` as a variant word and as a default on a filled surface.                                                                                                                                                                           |
+| `Item` consumers: `DropdownMenuItem`, `DropdownMenuCheckboxItem`, `DropdownMenuRadioItem`, `DropdownMenuSubMenu`, `SelectorOption`, `RadioListItem`, `ListItem`                                    | Five of seven hosts render `Item` with a `menuitem`, `option`, or radio role, where a resting panel of buttons is invalid ARIA; a presentational panel that fires on release is not. That is the line between `reveal` and `commit` (DEC-3).                     |
+| `Toast/useToastGesture.ts`                                                                                                                                                                         | A shipped commit-only swipe whose one meaning is dismissal, with constants (`SWIPE_DISMISS_RATIO`) in source.                                                                                                                                                    |
+| #6821 real-device feedback                                                                                                                                                                         | On an iOS device the swipe required a press-and-hold before it would start, and the row background did not restore until release. The gesture craft is not yet settled on a device.                                                                              |
+| The source product's row (#6821 is its port)                                                                                                                                                       | Its panel names the **state** ("Unread") where a menu would name the sentence ("Mark as unread"). A toggle swipes back; an archived row swipes out; a verb with no single instant (snooze) opens a chooser.                                                      |
 
 ## Cases the contract serves
 
-| Case                                                  | Served | How                                                                                                                                                                                                             |
-| ----------------------------------------------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Mail: archive and delete                              | Yes    | Both in the row's `MoreMenu`; both in `swipeActions.trailing` with the same handlers. Under `reveal` the panel rests open with two buttons; a long drag fires the outermost.                                    |
-| One destructive action                                | Yes    | One menu item, one swipe action, `variant: 'destructive'`. Under `commit` it fires on release. A handler that confirms first opens its dialog from a sprung-back row.                                           |
-| Reversible toggle (read/unread, pin/flag)             | Yes    | The panel label names the state the verb reaches ("Unread"); the menu names the sentence ("Mark as unread"); one handler. The row springs back after firing (FR5).                                              |
-| More than two actions                                 | Yes    | The menu holds all of them; `swipeActions` holds the few that earn a gesture. Under `reveal` the panel holds N buttons.                                                                                         |
-| An action that opens a confirm or a chooser           | Yes    | `onClick` opens the dialog from a sprung-back row; a verb with no single instant (snooze) commits to opening its chooser.                                                                                       |
-| Rows in a virtualized list                            | Yes    | Open state is the row's own; a row that unmounts takes it along. A mostly vertical drag stays the scroller's (FR6).                                                                                             |
-| Rows that are links (`href`)                          | Yes    | The axis lock separates the drag from the tap, and the click the browser synthesizes after a drag is swallowed (FR6).                                                                                           |
-| `role="list"` rows                                    | Yes    | `ListItem` inherits the prop; arbitrary interactive children are valid, so both models run.                                                                                                                     |
-| Swipe to activate a picker option                     | Yes    | The host passes `swipeActions` with the option's own verb and `swipeBehavior="commit"`; the panel is presentational, so it is valid inside a `listbox`. Selection is already keyboard-reachable, so AR1 is met. |
-| `reveal` on `listbox` options, `menuitem`, radio rows | **No** | ARIA forbids interactive descendants of `option` and `menuitem`; `Item` warns in development (FR10).                                                                                                            |
-| Dismiss-only swipe (Toast)                            | **No** | Owned by `useToastGesture`; a different concept with one meaning per direction.                                                                                                                                 |
+| Case                                                  | Served | How                                                                                                                                                                                                          |
+| ----------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Mail: archive and delete                              | Yes    | Two entries in `trailing`, both `hasRemoval`, Delete `variant: 'destructive'`. Under `reveal` the panel rests open with both; a long drag fires the outermost, and the row slides out.                       |
+| One destructive action                                | Yes    | One entry with `variant: 'destructive'`. Under `commit` it fires on release.                                                                                                                                 |
+| Reversible toggle (read/unread, pin/flag)             | Yes    | `label` names the state the verb reaches ("Unread"); the row springs back wearing it (FR5).                                                                                                                  |
+| Archive — removes the row but is not destructive      | Yes    | `hasRemoval` without `variant: 'destructive'`: the row slides out in the accent colour. The two axes are independent (DEC-1).                                                                                |
+| Soft delete with Undo — destructive but row stays     | Yes    | `variant: 'destructive'` without `hasRemoval`: the row springs back.                                                                                                                                         |
+| More than two actions                                 | Yes    | N entries on a side, outermost last. Under `reveal` each is a button.                                                                                                                                        |
+| An action that confirms or opens a chooser            | Yes    | Not a `hasRemoval` action: the row springs back and `onActivate` opens the dialog; the caller removes the row itself on confirmation. A verb with no single instant (snooze) commits to opening its chooser. |
+| Rows in a virtualized list                            | Yes    | Open state is the row's own; a row that unmounts takes it along. A mostly vertical drag stays the scroller's (FR6).                                                                                          |
+| Rows that are links (`href`)                          | Yes    | The axis lock separates the drag from the tap, and the click the browser synthesizes after a drag is swallowed (FR6).                                                                                        |
+| `role="list"` rows                                    | Yes    | `ListItem` inherits the prop; arbitrary interactive children are valid, so both models run.                                                                                                                  |
+| Swipe to activate a picker option                     | Yes    | One entry for the option's own verb and `swipeBehavior="commit"`; the panel is presentational, so it is valid inside a `listbox`.                                                                            |
+| `reveal` on `listbox` options, `menuitem`, radio rows | **No** | ARIA forbids interactive descendants of `option` and `menuitem`; `Item` warns in development (FR10).                                                                                                         |
+| A panel the vocabulary cannot draw                    | **No** | Not in this record. A `render*` addition is the deferred route (DEC-1).                                                                                                                                      |
+| Dismiss-only swipe (Toast)                            | **No** | Owned by `useToastGesture`; a different concept with one meaning per direction.                                                                                                                              |
 
 ## Public API and concepts
 
-| Concept               | Closed values or states                                                                                                                            | Meaning                                                                                                                                                                                                                                                                                                                                                   | Default  | Owner                       | Stability |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------------- | --------- |
-| `Item.swipeActions`   | `{leading?: ItemSwipeAction[]; trailing?: ItemSwipeAction[]}`                                                                                      | The verbs a sideways drag reaches on each side, outermost last. `leading` is uncovered by a drag toward the inline end, `trailing` by one toward the inline start. Inherited by `ListItem` and every host that renders an `Item`.                                                                                                                         | absent   | `spec:AST-057`              | proposed  |
-| `ItemSwipeAction`     | `{id?: string; label: string; icon?: ReactNode; onClick: () => void \| Promise<void>; isDisabled?: boolean; variant?: 'default' \| 'destructive'}` | One verb, in `DropdownMenuItemData`'s field vocabulary so the same object can feed `MoreMenu.items`. `label` is the panel's text and, under `reveal`, the button's accessible name; it names the **state** the verb reaches ("Unread"), which is why it may differ from a menu item's sentence.                                                           | —        | `spec:AST-057`              | proposed  |
-| `Item.swipeBehavior`  | `'reveal'` \| `'commit'`                                                                                                                           | `reveal`: past the panel's width the row rests open with every entry a real button; a long drag or fling fires the outermost. `commit`: a release past the commit point fires the outermost entry; nothing rests and the panel is presentational; valid for one entry per side, warns with more. "Swipe to activate" is `commit` with the row's own verb. | `reveal` | `spec:AST-057`              | proposed  |
-| the panels            | two out-of-flow positions on `Item`'s root                                                                                                         | Absolutely positioned children of the existing root at the inline start and end, painting above the root's background and below its content. Rendered by `Item` from `swipeActions`; present only when the side has entries. Anatomy, with a theme target; whether they become public slots is OQ3.                                                       | —        | `spec:AST-057`              | proposed  |
-| the drag's travel     | a private custom property on the row root                                                                                                          | Written by the gesture during a drag. The root's `transform` reads it; each panel's `transform` reads its negation, so the row moves and the panel appears fixed in the space the row vacates.                                                                                                                                                            | `0px`    | `spec:AST-057`              | proposed  |
-| the group's clip      | `overflow-inline: clip` on the element containing the rows                                                                                         | A moving row paints past its group's inline edge unless the group clips. `List` sets it; a host that renders `Item`s outside `List` sets it once on its own group. `Item` cannot clip itself: it is the thing moving.                                                                                                                                     | —        | `component:List` / the host | proposed  |
-| open state            | closed, resting open                                                                                                                               | The row's own. A pointer landing anywhere outside a resting row closes it, which is also how a drag on a neighbour closes it; no group state exists.                                                                                                                                                                                                      | closed   | `spec:AST-057`              | proposed  |
-| after an action fires | springs back                                                                                                                                       | The row returns to rest. A removal's exit is the host's or the list's, not assumed by the gesture (OQ5).                                                                                                                                                                                                                                                  | —        | `spec:AST-057`              | proposed  |
-| the modality split    | internal                                                                                                                                           | A mouse never starts the drag; a coarse pointer does. Read from the pointer event, not a prop or a media query (`architecture:interaction-modality` INV6).                                                                                                                                                                                                | —        | `spec:AST-057`              | proposed  |
+| Concept                  | Closed values or states                                                                                                                                                 | Meaning                                                                                                                                                                                                                                                                                                                                                | Default  | Owner                       | Stability |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- | --------------------------- | --------- |
+| `Item.swipeActions`      | `{leading?: ItemSwipeAction[]; trailing?: ItemSwipeAction[]}`                                                                                                           | The verbs a sideways drag uncovers on each side, outermost last. `leading` is uncovered by a drag toward the inline end, `trailing` by one toward the inline start. Inherited by `ListItem` and every host that renders an `Item`.                                                                                                                     | absent   | `spec:AST-057`              | proposed  |
+| `ItemSwipeAction`        | `{id?: string; label: string; icon?: ReactNode; onActivate: () => void \| Promise<void>; isDisabled?: boolean; variant?: ItemSwipeActionVariant; hasRemoval?: boolean}` | One verb. `Item` renders it as a filled surface in its `variant`'s colour with the icon above the label; `label` is the button's accessible name under `reveal` and names the **state** the verb reaches ("Unread"). Every field is known before the gesture begins.                                                                                   | —        | `spec:AST-057`              | proposed  |
+| `ItemSwipeActionVariant` | `'neutral'` \| `'accent'` \| `'destructive'`                                                                                                                            | How the action looks: ordinary, the one you mean, the dangerous one. Not a status set — a verb is not a state. Independent of `hasRemoval`. Shared with `spec:AST-058`'s `OptionAction`, whose default is `neutral`.                                                                                                                                   | `accent` | `spec:AST-057`              | proposed  |
+| `hasRemoval`             | `false`, `true`                                                                                                                                                         | The action declares that activating it removes the row. With it, `Item` slides the row out of the side it was travelling toward, stays out, and then fires `onActivate`; the caller drops the row from its data; the list collapses the gap. Without it, the row springs back wearing its new state. All four combinations with `variant` occur.       | `false`  | `spec:AST-057`              | proposed  |
+| `onActivate`             | called on tap of a resting panel, on the full-swipe accelerator, and on a `commit` release                                                                              | Core's word for a verb firing by any path. Not `onClick`: a commit fires with no click. Without `hasRemoval` it fires at activation; with `hasRemoval` once the exit completes, against a stable frame.                                                                                                                                                | —        | `spec:AST-057`              | proposed  |
+| `Item.swipeBehavior`     | `'reveal'` \| `'commit'`                                                                                                                                                | `reveal`: past the panel's width the row rests open with every entry a real button; a long drag or fling fires the outermost. `commit`: a release past the commit point fires the outermost entry; nothing rests; the panel is presentational; valid for one entry per side, warns with more. "Swipe to activate" is `commit` with the row's own verb. | `reveal` | `spec:AST-057`              | proposed  |
+| the panels               | two out-of-flow positions on `Item`'s root                                                                                                                              | Absolutely positioned children of the existing root at the inline start and end, painting above the root's background and below its content; present only when the side has entries. Internal anatomy with a theme target; not public slots.                                                                                                           | —        | `spec:AST-057`              | proposed  |
+| the drag's travel        | a private custom property on the row root                                                                                                                               | Written by the gesture during a drag. The root's `transform` reads it; each panel's `transform` reads its negation, so the row moves and the panel appears fixed in the space the row vacates.                                                                                                                                                         | `0px`    | `spec:AST-057`              | proposed  |
+| the group's clip         | `overflow-inline: clip` on the element containing the rows                                                                                                              | A moving row paints past its group's inline edge unless the group clips. `List` sets it; a host that renders `Item`s outside `List` sets it once. `Item` cannot clip itself: it is the thing moving.                                                                                                                                                   | —        | `component:List` / the host | proposed  |
+| open state               | closed, resting open                                                                                                                                                    | The row's own. A pointer landing anywhere outside a resting row closes it, which is also how a drag on a neighbour closes it; no group state exists.                                                                                                                                                                                                   | closed   | `spec:AST-057`              | proposed  |
+| the modality split       | internal                                                                                                                                                                | A mouse never starts the drag; a coarse pointer does. Read from the pointer event, not a prop or a media query (`architecture:interaction-modality` INV6).                                                                                                                                                                                             | —        | `spec:AST-057`              | proposed  |
 
 Not public: axis-lock distance, commit ratio, fling velocity, durations,
 resistance, panel widths, the custom property's name. They are behavior
@@ -196,47 +205,45 @@ constants.
 
 ### Behavioral contract
 
-| ID   | Invariant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Basis                                                               | Verification state                                              |
-| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- | --------------------------------------------------------------- |
-| FR1  | `Item` MUST take its swipe actions as `swipeActions: {leading?: ItemSwipeAction[]; trailing?: ItemSwipeAction[]}`, where `ItemSwipeAction` keeps the names and meanings of `DropdownMenuItemData`'s fields (`id`, `label`, `icon`, `onClick`, `isDisabled`, `variant`), so one object can serve the swipe and a `MoreMenu`. An action MUST NOT carry a node the component renders as the control. `ListItem` MUST pass the prop through unchanged.                                                                                                                                         | DEC-1; `DropdownMenu.items`, `MoreMenu.items`                       | Proposed; no evidence on `main`                                 |
-| FR2  | `Item` MUST render each side's panel from its entries into an out-of-flow position on its existing root, and MUST add no element to the row for it. The gesture MUST drive the row's travel by writing a custom property on the root; the root's transform MUST read it and each panel's transform its negation.                                                                                                                                                                                                                                                                           | DEC-6; `useToastGesture`                                            | Proposed; real-Chromium evidence required                       |
-| FR3  | `swipeBehavior` MUST be one enum with the closed values `reveal` and `commit`, default `reveal`. `commit` with more than one entry on a side MUST warn in development, because the other entries have no touch path.                                                                                                                                                                                                                                                                                                                                                                       | DEC-3; `spec:AST-002` FR15                                          | Proposed                                                        |
-| FR4  | A sideways drag on a coarse pointer MUST move the row and uncover the side's panel, showing each entry's `label` and `icon` in its `variant`'s state colour; the panel MUST NOT be visible at rest, by any pixel.                                                                                                                                                                                                                                                                                                                                                                          | #6821 review (resting-panel sliver)                                 | Proposed; real-Chromium evidence required                       |
-| FR5  | Under `reveal`, a release past the panel's width MUST leave the row resting open with every entry tappable, and a drag past the commit point or a fling MUST fire the **outermost** entry and no other. Under `commit`, a release past the commit point or a fling MUST fire the outermost entry and nothing MUST rest. A release short of the threshold MUST spring back under both. After an entry fires the row MUST spring back; the gesture MUST NOT assume the row leaves. A handler may return a Promise; a confirming or choosing handler opens its dialog from a sprung-back row. | DEC-3; UIKit `performsFirstActionWithFullSwipe`; source product     | Proposed; real-device evidence required                         |
-| FR6  | The drag MUST decide its axis once, early, and a mostly vertical drag MUST stay the scroller's. A mouse MUST NOT start the drag. The click the browser synthesizes after a drag MUST NOT fire the row's primary action.                                                                                                                                                                                                                                                                                                                                                                    | #6821's gesture; press-model ORD1                                   | Proposed; device feedback on #6821 shows the first is unsettled |
-| FR7  | A resting row MUST close on a pointer landing anywhere outside it, on Escape with focus inside it, on firing an entry, and on unmount. Because a drag on a neighbour is a pointer outside it, at most one row rests open at a time without any shared state.                                                                                                                                                                                                                                                                                                                               | DEC-4; SwiftUI `swipeActionsContainer()` for the outcome            | Proposed                                                        |
-| FR8  | Directions MUST be logical: `trailing` is uncovered by a drag toward the inline start and sits at the inline end; `leading` the reverse; so the finger, the uncovered edge, and the panel agree under RTL.                                                                                                                                                                                                                                                                                                                                                                                 | #6821; `architecture:public-component-api` INV2 (logical direction) | Proposed                                                        |
-| FR9  | The element containing swipe-capable rows MUST clip in the inline axis with `overflow-inline: clip`, never `hidden`. `List` MUST set it; `Item`'s consumer documentation MUST state the obligation for any other host.                                                                                                                                                                                                                                                                                                                                                                     | DEC-6; `List` root styles                                           | Proposed                                                        |
-| FR10 | `reveal` MUST warn in development when the row's root is inside a `listbox`, `menu`, or `radiogroup`, derived from the rendered DOM; `commit` runs there without warning.                                                                                                                                                                                                                                                                                                                                                                                                                  | DEC-4; ARIA allowed-children rules                                  | Proposed                                                        |
+| ID   | Invariant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | Basis                                                                           | Verification state                                              |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| FR1  | `Item` MUST take its swipe actions as `swipeActions: {leading?: ItemSwipeAction[]; trailing?: ItemSwipeAction[]}`, where `ItemSwipeAction` is `{id?, label: string, icon?: ReactNode, onActivate, isDisabled?, variant?: 'neutral' \| 'accent' \| 'destructive', hasRemoval?: boolean}` with `variant` defaulting to `accent`. An entry MUST NOT carry a node the component renders as the control. `ListItem` MUST pass the prop through unchanged.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | DEC-1; `DropdownMenuItemData`; `useMenuPress.onActivate`; `ProgressBar.variant` | Proposed; no evidence on `main`                                 |
+| FR2  | `Item` MUST render each side's panel from its entries into an out-of-flow position on its existing root and MUST add no element to the row for it. The gesture MUST drive the row's travel by writing a custom property on the root; the root's transform MUST read it and each panel's transform its negation.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | DEC-5; `useToastGesture`                                                        | Proposed; real-Chromium evidence required                       |
+| FR3  | `swipeBehavior` MUST be one enum with the closed values `reveal` and `commit`, default `reveal`. `commit` with more than one entry on a side MUST warn in development, because the other entries have no touch path.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | DEC-2; `spec:AST-002` FR15                                                      | Proposed                                                        |
+| FR4  | A sideways drag on a coarse pointer MUST move the row and uncover the side's panel, showing each entry's `label` and `icon` as a filled surface in its `variant`'s colour; the panel MUST NOT be visible at rest, by any pixel.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | #6821 review (resting-panel sliver)                                             | Proposed; real-Chromium evidence required                       |
+| FR5  | Under `reveal`, a release past the panel's width MUST leave the row resting open with every entry tappable, and a drag past the commit point or a fling MUST fire the **outermost** entry and no other. Under `commit`, a release past the commit point or a fling MUST fire the outermost entry and nothing MUST rest. A release short of the threshold MUST spring back under both. Without `hasRemoval`, the row MUST spring back and `onActivate` fires at activation. With `hasRemoval`, the row MUST slide out of the side it was travelling toward, MUST stay out, and MUST fire `onActivate` once the exit completes; under `commit` the exit IS the commit travel, not a second animation. `Item` owns both animations; the caller owns removing the row from its data; the list owns collapsing the gap. A `hasRemoval` row still mounted a beat after its exit MUST warn in development. `onActivate` may return a Promise. | DEC-1, DEC-2; UIKit `performsFirstActionWithFullSwipe`; source product          | Proposed; real-device evidence required                         |
+| FR6  | The drag MUST decide its axis once, early, and a mostly vertical drag MUST stay the scroller's. A mouse MUST NOT start the drag. The click the browser synthesizes after a drag MUST NOT fire the row's primary action.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | #6821's gesture; press-model ORD1                                               | Proposed; device feedback on #6821 shows the first is unsettled |
+| FR7  | A resting row MUST close on a pointer landing anywhere outside it, on Escape with focus inside it, on firing an entry, and on unmount. Because a drag on a neighbour is a pointer outside it, at most one row rests open at a time without any shared state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | DEC-3; SwiftUI `swipeActionsContainer()` for the outcome                        | Proposed                                                        |
+| FR8  | Directions MUST be logical: `trailing` is uncovered by a drag toward the inline start and sits at the inline end; `leading` the reverse; so the finger, the uncovered edge, and the panel agree under RTL. A `hasRemoval` exit continues in the direction of travel.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | #6821; `architecture:public-component-api` INV2 (logical direction)             | Proposed                                                        |
+| FR9  | The element containing swipe-capable rows MUST clip in the inline axis with `overflow-inline: clip`, never `hidden`. `List` MUST set it; `Item`'s consumer documentation MUST state the obligation for any other host.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | DEC-5; `List` root styles                                                       | Proposed                                                        |
+| FR10 | `reveal` MUST warn in development when the row's root is inside a `listbox`, `menu`, or `radiogroup`, derived from the rendered DOM; `commit` runs there without warning.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | DEC-3; ARIA allowed-children rules                                              | Proposed                                                        |
 
 ### Accessibility contract
 
-- **AR1 — The swipe is never the only path, and the row proves it.** Every
-  verb in `swipeActions` MUST also be reachable through an interactive
-  control the row carries on every input — a `MoreMenu` fed by the same
-  descriptors, buttons, or the row's own primary element when the verb is
-  its own (swipe to activate). A row whose rendered root contains no
-  focusable element other than the panels' buttons MUST warn in development.
-  Derived from the rendered DOM, not from inspecting `ReactNode` children.
-- **AR2 — The panel is real while resting and absent while closed.** Under
+- **AR1 — The panel is real while resting and absent while closed.** Under
   `reveal`, while the row rests open each entry MUST be a real, focusable
   `<button>` named by `label`, so a touch screen reader that lands on it can
   activate it; while closed the panel MUST be out of the accessibility tree
   and the tab order. Under `commit` the panel MUST be presentational
   (`aria-hidden`) at all times, because nothing in it is ever tappable.
-- **AR3 — Nothing swipe-only reaches a keyboard or a mouse.** On a pointer
-  that can hover, `swipeActions` MUST have no effect on the tab order, the
-  accessible tree, or the row's paint. Hover MUST NOT uncover the panel.
-- **AR4 — The row's primary stays one tab stop.** `swipeActions` MUST NOT
+- **AR2 — The gesture touches nothing on a pointer that can hover.**
+  `swipeActions` MUST have no effect on the tab order, the accessible tree,
+  or the row's paint on such a pointer. Hover MUST NOT uncover the panel.
+- **AR3 — The row's primary stays one tab stop.** `swipeActions` MUST NOT
   change the primary element's role, name, or activation, and MUST add no
   stop while closed.
+- **Stated in documentation, not enforced:** a swipe is a touch accelerator,
+  so a verb reachable only by swipe is unreachable by keyboard and by mouse.
+  The consumer documentation of `swipeActions` MUST say so and MUST show the
+  verb also reachable through the row's own content. The component does not
+  inspect what else the row offers.
 
 ### Platform support
 
 - Supported feature/engine floor: every supported renderer and browser.
   Pointer type is read from the pointer event.
 - Unsupported behavior: a device that never produces a coarse pointer gets
-  no swipe and nothing else changes; the row's own control is the path.
+  no swipe and nothing else changes.
 - Browser evidence: FR2 and FR4–FR9 are paint and gesture claims. jsdom has
   neither; real-Chromium evidence with dispatched touch is required, and
   FR5/FR6 additionally need a physical touch device because #6821's device
@@ -244,29 +251,28 @@ constants.
 
 ## Current-state impact
 
-- `Item` gains `swipeActions`, `swipeBehavior`, the type `ItemSwipeAction`,
-  two out-of-flow panel positions on its root with a theme target, and the
-  root and panel transforms. No new element, no gesture on any row that does
-  not ask for it. `component:Item`, when written, inherits these claims.
+- `Item` gains `swipeActions`, `swipeBehavior`, the exported types
+  `ItemSwipeAction` and `ItemSwipeActionVariant`, two out-of-flow panel
+  positions on its root with a theme target, and the root and panel
+  transforms. No new element, no gesture on any row that does not ask for
+  it. `component:Item`, when written, inherits these claims.
 - `ListItem` inherits both props through its existing `Item` passthrough.
 - `component:List` gains the inline clip on `List`'s root, citing this
   record.
-- `component:DropdownMenu` is read, not changed: `DropdownMenuItemData` is
-  reused as a vocabulary.
 - `architecture:interaction-modality` gains `spec:AST-057` in its deciding
   specs; no invariant changes.
 - `contributing:api-conventions` gains the rule this record relies on: a
-  gesture accelerates verbs a row already exposes through a visible control;
-  it never introduces one.
-- `MoreMenu`'s consumer docs gain the pairing example: the same `items`
-  feeding a row's menu and its swipe.
+  gesture is an accelerator and never a component's only path to its own
+  behavior.
+- `spec:AST-058` ([#6910](https://github.com/facebook/astryx/pull/6910))
+  shares the verb vocabulary and `onActivate`; `hasRemoval` is this record's
+  alone. Whether the two action types are siblings is OQ1 on both records.
 - [#6821](https://github.com/facebook/astryx/pull/6821) is superseded in
   shape by this record; its commit-only model survives as
   `swipeBehavior="commit"` and its gesture engineering — axis lock, logical
   directions, click suppression, reduced-motion handling, the Chromium
   harness — is the starting point for FR4–FR8 once the device findings are
-  resolved. Its clipping container around a new inner row does not survive
-  (DEC-6).
+  resolved. Its clipping container does not survive (DEC-5).
 - No shipped public API changes on this record's own merge.
 - While this record is `draft` its `review-applicability:v1` block routes
   nothing: global routing loads `current` claims only
@@ -274,15 +280,16 @@ constants.
 
 ## Verification
 
-| Contract      | Verification                                                                                       | Representative states                                                                                                      | Mutation or failure expectation                                                                                                                                        |
-| ------------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| FR1, FR3      | `Item` and `ListItem` prop-surface suites plus exported-type checks                                | One, two, and four entries per side; the same array passed to `MoreMenu.items`; `commit` with two entries on a side        | A field diverging from `DropdownMenuItemData`, a silent multi-entry `commit`, or `ListItem` reshaping the prop fails.                                                  |
-| FR2           | `Item` DOM snapshot suite plus real-Chromium evidence                                              | No swipe actions; one side; both sides; each render mode (`onClick`, `href`, delegation, parent role); mid-drag            | A new element in any row, a changed DOM on an existing row, a panel that moves with the row, or a panel painted under the root's background or over the content fails. |
-| FR4–FR6, FR8  | Real-Chromium dispatched-touch evidence plus physical-device check; RTL via the direction provider | Rest; release short, past the panel, past the commit point, fling; both models; both sides; vertical drag; mouse drag; RTL | A resting sliver, an immediate fire under `reveal`, a rest under `commit`, the wrong entry fired, a row that slides out on a toggle, or a mirrored panel fails.        |
-| FR7           | `Item` suite with two rows under one parent                                                        | Open one, drag the other; outside tap; Escape; entry fired; unmount                                                        | Two rows resting open, or a row that stays open after any closing event, fails.                                                                                        |
-| FR9           | `List` style assertion plus real-Chromium evidence of a row dragged past the edge                  | A row at the list's inline edge mid-drag; the list scrolled vertically                                                     | A horizontal scrollbar, the row painting past the list, or `hidden` where `clip` is specified fails.                                                                   |
-| FR10, AR1     | Development-warning suites over rendered DOM                                                       | `reveal` inside a `listbox`; `commit` inside a `listbox`; a row with a `MoreMenu`; a row with nothing else focusable       | A missing or false warning fails.                                                                                                                                      |
-| AR2, AR3, AR4 | Accessible-tree and tab-order assertions, open and closed, both models; hovering-pointer evidence  | Closed; resting open; `commit` mid-drag; touch screen-reader cursor on an entry; hover and Tab on a fine pointer           | A panel exposed while closed, a `commit` panel in the tree, an entry without a name while resting, a changed primary, or any effect on a fine pointer fails.           |
+| Contract      | Verification                                                                                       | Representative states                                                                                                                                                                                   | Mutation or failure expectation                                                                                                                                                                                                                                         |
+| ------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR1, FR3      | `Item` and `ListItem` prop-surface suites plus exported-type checks                                | One, two, and four entries per side; every `variant` × `hasRemoval` combination; `commit` with two entries on a side                                                                                    | A field with a node the row renders as the control, a silent multi-entry `commit`, or `ListItem` reshaping the prop fails.                                                                                                                                              |
+| FR2           | `Item` DOM snapshot suite plus real-Chromium evidence                                              | No swipe actions; one side; both sides; each render mode (`onClick`, `href`, delegation, parent role); mid-drag                                                                                         | A new element in any row, a changed DOM on an existing row, a panel that moves with the row, or a panel painted under the root's background or over the content fails.                                                                                                  |
+| FR4–FR6, FR8  | Real-Chromium dispatched-touch evidence plus physical-device check; RTL via the direction provider | Rest; release short, past the panel, past the commit point, fling; both models; both sides; `hasRemoval` and plain entries; a `hasRemoval` row the caller never removes; vertical drag; mouse drag; RTL | A resting sliver, an immediate fire under `reveal`, a rest under `commit`, the wrong entry fired, a `hasRemoval` row that springs back, a plain row that slides out, `onActivate` before the exit, a missing warning on a row never removed, or a mirrored panel fails. |
+| FR7           | `Item` suite with two rows under one parent                                                        | Open one, drag the other; outside tap; Escape; entry fired; unmount                                                                                                                                     | Two rows resting open, or a row that stays open after any closing event, fails.                                                                                                                                                                                         |
+| FR9           | `List` style assertion plus real-Chromium evidence of a row dragged past the edge                  | A row at the list's inline edge mid-drag; the list scrolled vertically                                                                                                                                  | A horizontal scrollbar, the row painting past the list, or `hidden` where `clip` is specified fails.                                                                                                                                                                    |
+| FR10          | Development-warning suite over rendered DOM                                                        | `reveal` inside a `listbox`; `commit` inside a `listbox`; `reveal` inside a `list`                                                                                                                      | A missing or false warning fails.                                                                                                                                                                                                                                       |
+| AR1–AR3       | Accessible-tree and tab-order assertions, open and closed, both models; hovering-pointer evidence  | Closed; resting open; `commit` mid-drag; touch screen-reader cursor on an entry; hover and Tab on a fine pointer                                                                                        | A panel exposed while closed, a `commit` panel in the tree, an entry without a name while resting, a changed primary, or any effect on a fine pointer fails.                                                                                                            |
+| Documentation | Consumer-doc check on `swipeActions`                                                               | The prop's documentation                                                                                                                                                                                | A doc that does not state the keyboard consequence, the `hasRemoval` obligation, or the group clip fails.                                                                                                                                                               |
 
 Known verification gap: none of the suites above exist on `main`, and no
 component implements the contract. This record is `draft`, does not govern
@@ -293,57 +300,74 @@ review, and names no implementation.
 Every decision below is **proposed**. None has been ruled on; `approved_by`
 is `null` and the record is `draft`.
 
-### DEC-1 — Swipe actions are declared as data in the menu-row vocabulary
+### DEC-1 — Swipe actions are declared as data; `hasRemoval` is why
 
 **Reference:** `spec:AST-057/DEC-1`
 **Decider:** `cixzhang`, `2026-10-02` (direction; record pending)
 
-`swipeActions.leading` and `.trailing` are `ItemSwipeAction[]`, with
-`DropdownMenuItemData`'s field names and meanings. Under `reveal` the panel
-renders one real button per entry; under `commit` one presentational block.
+`swipeActions.leading` and `.trailing` are `ItemSwipeAction[]`: `{id?, label,
+icon?, onActivate, isDisabled?, variant?, hasRemoval?}`. `Item` renders each
+entry — under `reveal` as a real button, under `commit` as a presentational
+block — and paints the panel during the drag from the data.
 
-The component paints the panel during the drag: it needs each entry's label,
-icon and state colour while the finger is down, how many there are, and
-which is last. Core already declares verbs as data for the same reason in
-`DropdownMenu.items` and `MoreMenu.items`, and reusing that vocabulary lets
-one object feed both a row's menu and its swipe. Two independent vibe tests
-agree: builders asked for row actions with no prop names given reached for
-an array of `{label, icon, onClick}` in every recall probe — 3/3 in this
-record's test
-(`internal/vibe-tests/row-actions-shape-test/RESULTS.md`), 3/3 under the
-key `actions` in the picker-row test
-([#6909](https://github.com/facebook/astryx/pull/6909)) — and none reached
+Every field is known before the gesture begins, so the component picks the
+right animation up front: a `hasRemoval` entry ends in a slide-out, any
+other in a spring-back. That is what a declared shape gives and a node
+cannot: a caller's own node has no way to say the row will leave, or to be
+committed on release, without registering through a context — which splits
+the API into shipped nodes that get the behavior and arbitrary nodes that
+silently do not. Core already declares a verb as data in `DropdownMenu.items`
+and `MoreMenu.items`, and two independent recall probes (3/3 in this record's
+vibe test, `internal/vibe-tests/row-actions-shape-test/RESULTS.md`; 3/3 in
+[#6909](https://github.com/facebook/astryx/pull/6909)) found builders
+reaching for exactly this array with no prop names given, and none reaching
 for child components or a render prop.
 
-Rejected: a `ReactNode` slot of controls — the panel cannot be painted
-mid-drag around content the component does not understand, and the slot
-loses vocabulary parity with the menu. Rejected: one action per side with
-`onAction` (#6821) — a second action vocabulary and a cap the resting model
-does not have.
+The vocabulary: `onActivate` is core's word for a row's verb firing by a
+path that is not a click (`useMenuPress`, `useTreeFocus`, `Selector`,
+`TreeList`), and a commit fires on release with no click at all. `variant`
+is `'neutral' | 'accent' | 'destructive'` — three flavours of verb, not a
+status set, because a verb is not a state; `accent` is the default because
+a swipe panel is a filled surface that has to be some colour, and
+`ProgressBar` already defaults a filled surface to `accent`. `hasRemoval`
+takes the `has*` prefix because it declares what activation will do; `is*`
+names a state the thing is in, so `isRemoving` would read as progress.
 
-### DEC-2 — The swipe accelerates verbs the row already exposes; it never introduces one
+`hasRemoval` and `variant` are independent axes and all four combinations
+occur: Archive removes a row from an inbox without being destructive, and a
+soft Delete with Undo is destructive while the row stays. A removal is owned
+three ways and no one party can do it alone: the caller owns the data and is
+the only one who can unmount the row; `Item` owns the exit, because it is
+the element translating, so it slides itself out of the side it was
+travelling toward and stays out; the list owns the gap, which it collapses
+after the exit. `onActivate` fires once the exit completes so the handler
+runs against a stable frame. `hasRemoval` is therefore a promise the caller
+makes — a row still mounted a beat after its exit warns in development,
+because `Item` cannot tell slow removal from none and springing back on a
+timeout would be wrong whenever removal is merely slow. One consequence is
+stated rather than hidden: an action that must confirm before removing is
+not a `hasRemoval` action, because the exit would precede the dialog that may
+cancel it; it springs back, asks, and the caller removes the row on
+confirmation.
+
+Composition is deferred, not lost: a `render*`-shaped addition for a panel
+the vocabulary cannot draw can land when a caller needs it.
+
+Rejected: nodes per side with a shipped `ItemSwipeAction` component — it
+needed context registration for `commit` and for removal, and left any
+caller-supplied node silently without both. Rejected: one action per side
+with `onAction` and a four-tone `tone` (#6821) — a second verb vocabulary.
+Rejected: folding removal into `variant` — Archive would have to be
+destructive to leave. Rejected: always springing back and leaving removal to
+the caller's unmount — an archived row visibly springing back and then
+vanishing reads as a glitch. Rejected: firing `onActivate` before the exit —
+the caller's data changes while the row is still animating. Rejected: a
+removal-edge field — the row is already travelling, and reversing
+mid-animation reads as a yank.
+
+### DEC-2 — Rest is the default; commit is a caller choice for one verb
 
 **Reference:** `spec:AST-057/DEC-2`
-**Decider:** `cixzhang`, `<pending>`
-
-A row's verbs live in a control it already carries on every input — a list
-row's `MoreMenu` in `endContent`, an option's own selection. `swipeActions`
-names which of those a drag reaches. A row whose root holds no other
-focusable element warns in development; the check reads the rendered DOM,
-which keeps it inside the `ReactNode` introspection boundary.
-
-This is how the product the gesture comes from keeps it honest: the swipe
-verbs are the handlers the menu already acts through, so the two cannot reach
-different state.
-
-Rejected: a prose obligation alone, which review cannot enforce. Rejected
-for now: `Item` rendering the menu itself from the same array — it would
-make divergence unrepresentable but moves a caller-composed surface into the
-row (OQ2 offers it back).
-
-### DEC-3 — Rest is the default; commit is a caller choice for one verb
-
-**Reference:** `spec:AST-057/DEC-3`
 **Decider:** `cixzhang`, `<pending>`
 
 `swipeBehavior: 'reveal' | 'commit'`, default `reveal`. Under `reveal` the
@@ -362,16 +386,17 @@ state are one question, which is why `commit` with several entries on a side
 warns. A resting panel also gives a touch user something to see before a
 destructive verb fires, which is why it is the default. Commit is kept
 because the owner asked for both models and for swipe-to-activate, and it is
-what the source product chose for its one-verb rows.
+what the source product chose for its one-verb rows. A `hasRemoval` commit
+needs no second animation: the exit is the commit travel.
 
 Rejected: commit-only as the sole model (#6821) — it cannot grow into
 resting without a default change. Rejected: a boolean `hasFullSwipe` — under
 `reveal` the full swipe is already on and under `commit` it is the whole
 behavior, so a boolean gates the wrong axis.
 
-### DEC-4 — The capability is `Item`'s; `ListItem` inherits it; the model follows the host's role
+### DEC-3 — The capability is `Item`'s; `ListItem` inherits it; the model follows the host's role
 
-**Reference:** `spec:AST-057/DEC-4`
+**Reference:** `spec:AST-057/DEC-3`
 **Decider:** `cixzhang`, `2026-10-02` (direction; record pending)
 
 `Item` owns `swipeActions` and `swipeBehavior`. `ListItem` inherits them
@@ -392,33 +417,28 @@ so it runs anywhere, which is what makes swipe-to-activate an option valid.
 
 Rejected: a prop on `ListItem` alone — the gesture is not list-specific, and
 `ListItem` does not own the root. Rejected: a behavior hook that hosts
-compose, with `ListItem` as a shell — one-open-at-a-time was its reason to
-exist as group state, and outside-close gives the same outcome with no
-shared state, so the hook adds a public primitive with nothing left to own.
+compose — one-open-at-a-time was its reason to exist as group state, and
+outside-close gives the same outcome with nothing shared.
 
-### DEC-5 — No hover reveal; the row's own control is the desktop counterpart
+### DEC-4 — No hover reveal
 
-**Reference:** `spec:AST-057/DEC-5`
+**Reference:** `spec:AST-057/DEC-4`
 **Decider:** `cixzhang`, `2026-10-02` (direction; record pending)
 
-On a pointer that can hover, `swipeActions` does nothing. The row's verbs
-are reached through the control composed into `endContent`, or the row's
-own primary.
-
-The row already carries its verbs there, on every row, on every input. The
-swipe never carries a verb the row lacks (AR1), so the arrangement has the
-two surfaces iOS has with its Actions rotor: a declared, always-reachable
-set, and a gesture that accelerates it.
+On a pointer that can hover, `swipeActions` does nothing. The gesture is a
+touch accelerator and changes nothing on any other input; what a row offers
+a mouse or a keyboard is the row's own content, which this record does not
+govern.
 
 Rejected: a reveal axis that rendered the same actions as hover-revealed
-buttons on a fine pointer — a second surface for verbs `endContent` already
-holds. [React Aria's iOS List example](https://react-aria.adobe.com/examples/ios-list)
+buttons on a fine pointer — a second surface for verbs the row's content can
+already carry. [React Aria's iOS List example](https://react-aria.adobe.com/examples/ios-list)
 takes that route (a panel button in the tree, revealed on focus) and is the
 alternative this decision sets aside.
 
-### DEC-6 — The root translates and the panels counter-translate; no element is added
+### DEC-5 — The root translates and the panels counter-translate; no element is added
 
-**Reference:** `spec:AST-057/DEC-6`
+**Reference:** `spec:AST-057/DEC-5`
 **Decider:** `cixzhang`, `2026-10-02` (direction; record pending)
 
 `Item` renders each side's panel as an absolutely positioned child of its
@@ -428,7 +448,8 @@ root — the way `useToastGesture` writes `--_toast-swipe-y` — the root's
 transform reads it, and each panel's transform reads its negation, so the
 row moves and the panel appears fixed in the space the row vacates. Both are
 compositor transforms and the cancellation is exact. No element is added to
-any row. The group clips with `overflow-inline: clip`.
+any row. The group clips with `overflow-inline: clip`. The positions are
+internal: no public slot is admitted for them.
 
 Layering and translation are different problems and neither needs a new
 element. Layering is absolute positioning inside a containing block the root
@@ -448,56 +469,32 @@ row — the element the owner asked to avoid. Rejected: panels as siblings at
 the list level, positioned at each row's offset — a position-sync loop
 against resize, reflow and virtualized mounts. Rejected: animating
 `padding-inline-start` on the root — layout on every frame under a finger
-instead of a compositor transform.
+instead of a compositor transform. Rejected: public `beforeContent` /
+`afterContent` slots — nothing in this record needs them, and general
+anatomy takes its own admission.
 
 ## Open questions
 
-- **OQ1 — Does the shape stand: `swipeActions: {leading?, trailing?}` of `ItemSwipeAction[]` in the menu-row vocabulary, on `Item`?** (`human-api`)
+- **OQ1 — Are `ItemSwipeAction` and `spec:AST-058`'s `OptionAction` siblings sharing one vocabulary, or one type?** (`human-api`)
 
-  The panel is painted from the data; the vocabulary pairs with
-  `MoreMenu.items`; two independent recall probes went 3–0 each for a data
-  array. Confirm, or rule for a slot of controls, which flips FR1 and DEC-1.
+  [#6910](https://github.com/facebook/astryx/pull/6910) has settled its
+  side: `OptionAction` with `onActivate` and `variant: 'neutral' | 'accent' |
+'destructive'`, `neutral` as the picker default, and it names `hasRemoval`
+  as this record's alone. The vocabulary and handler are identical; the two
+  surfaces differ in paint and default — a swipe panel is a filled block in
+  `accent`, an option action a small `neutral` control on the panel's own
+  background — and only the swipe carries `hasRemoval`. The recommendation,
+  agreeing with AST-058, is siblings: two types sharing the field names, not
+  one type with fields half of its users ignore.
 
-- **OQ2 — Is "same handlers, checked in development" strong enough, or should `Item` render the menu itself from one array?** (`human-api`)
+- **OQ2 — Does `ItemSwipeAction` default to `accent` on both models, or to `neutral` under `reveal` where several sit side by side?** (`human-design`)
 
-  Today's shape (DEC-2): the caller composes a `MoreMenu` into `endContent`
-  and passes the swipe the same handlers; the row warns if it finds no other
-  focusable control. The stronger shape: `Item.actions: ItemSwipeAction[]`
-  renders a `MoreMenu` at the row's end on every input and drives the swipe
-  from the same array, so a swipe verb cannot exist without a menu item. It
-  costs the caller the menu's position, label and presentation. Confirm, or
-  take the stronger shape.
+  A lone `commit` panel wants the accent; three resting buttons all in accent
+  may want the ordinary one with `accent` on the one that matters. The
+  recommendation is `accent` everywhere, as directed, with the caller
+  choosing `neutral` for the others.
 
-- **OQ3 — Do the two out-of-flow panel positions become public slots on `Item`, and under what names?** (`human-api`)
-
-  The swipe needs none: `Item` renders the panels from `swipeActions`. As
-  public slots they would be general anatomy — a leading accent bar, a
-  slide-in selection checkbox, a drag handle all need content outside the
-  row's flow and are impossible today — and general anatomy takes general
-  names. `beforeContent` / `afterContent` distinguish from `startContent` /
-  `endContent` on the axis that matters: inside the row's flow versus outside
-  it. Swipe-specific names would be wrong for general slots, and general
-  slots deserve their own admission with the swipe as first consumer. The
-  recommendation is to keep the positions internal here and admit the slots
-  in a `component:Item` record if a second consumer appears. Rule.
-
-- **OQ4 — Is the destructive marker `variant: 'default' | 'destructive'`?** (`human-design`)
-
-  With the same objects feeding `MoreMenu.items`, the menu's word wins by
-  construction. The shared status set `'success' | 'warning' | 'error'` and
-  #6821's four-tone `tone` were weighed; `Badge`'s variant map was set aside
-  because it also carries decorative colours. Confirm.
-
-- **OQ5 — Should an `ItemSwipeAction` be able to say the row leaves?** (`human-design`)
-
-  FR5 springs back after every fire and leaves a removal's exit to the host
-  or the list. The source product swipes an archived row out of the shelf
-  while a toggle springs back. A field such as `removesRow?: boolean` would
-  carry that, at the cost of a field `MoreMenu.items` ignores. The
-  recommendation is spring-back only here, with the field as an additive
-  follow-up.
-
-- **OQ6 — Does a product need to open or close a row programmatically?** (`checkable`)
+- **OQ3 — Does a product need to open or close a row programmatically?** (`checkable`)
 
   Framework7 and Quasar expose `open`/`close`/`reset`; SwiftUI added
   `onPresentationChanged`. No Astryx product has asked. A controlled pair
@@ -512,8 +509,7 @@ contract, and lives outside it: the vibe test in
 the pull request that introduced the record.
 
 This record does not duplicate `Item`'s or `List`'s anatomy, prop tables,
-theming targets, or geometry contracts; `DropdownMenu`'s item-data contract,
-which it reuses; the modality invariants in
+theming targets, or geometry contracts; the modality invariants in
 `architecture:interaction-modality`; the admission argument in
 `spec:AST-002`; the press model in `module:DropdownMenu/useMenuPress`; or the
 gesture constants an implementation will hold in source. It links their

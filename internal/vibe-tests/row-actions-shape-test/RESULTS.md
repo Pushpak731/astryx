@@ -137,8 +137,9 @@ the menu item vocabulary rather than a four-tone enum (OQ for the owner).
   rather than `Item`, to hold the host constant.
 - No implementation exists; every stub is a type the record proposes.
 - The arms were props on `ListItem` documenting a hover reveal. The record
-  has since settled on `Item.swipeActions` (data per side, no hover reveal,
-  `Item` inherits to `ListItem`). The data-vs-slot finding transfers; the
+  has since settled on `Item.swipeActions` as declared `ItemSwipeAction[]`
+  per side with `onActivate`, `variant`, `hasRemoval`, no hover reveal, and
+  `ListItem` inheriting. The data-vs-slot finding transfers directly; the
   keyboard-path scores assumed a hover reveal and do not.
 
 ## 6. Files
