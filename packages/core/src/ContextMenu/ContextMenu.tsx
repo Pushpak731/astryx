@@ -606,8 +606,14 @@ export function ContextMenu({
   // its own drill-in.
   const {drillIn, wrapContent} = useMenuDrillIn(isOpen && !usesBottomSheet);
   const contextValue = useMemo<DropdownMenuContextValue>(
-    () => ({closeMenu, menuSize: size, drillIn, menuLabel: label}),
-    [closeMenu, size, drillIn, label],
+    () => ({
+      closeMenu,
+      menuSize: size,
+      drillIn,
+      menuLabel: label,
+      isMenuOpen: isOpen,
+    }),
+    [closeMenu, size, drillIn, label, isOpen],
   );
 
   const resolvedMenuContent = wrapContent(

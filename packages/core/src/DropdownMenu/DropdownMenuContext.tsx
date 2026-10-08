@@ -63,6 +63,14 @@ export interface DropdownMenuContextValue {
    * row reads "Back to <this>".
    */
   menuLabel?: string;
+  /**
+   * Whether the root menu is open. A sub-menu's hover intent must die with
+   * the menu: a hover-open scheduled on its trigger before the menu closed
+   * from elsewhere would otherwise fire into the hidden menu and reopen the
+   * flyout behind it (#6893). Absent when a provider has no signal to give;
+   * consumers treat that as open.
+   */
+  isMenuOpen?: boolean;
 }
 
 export const DropdownMenuContext =

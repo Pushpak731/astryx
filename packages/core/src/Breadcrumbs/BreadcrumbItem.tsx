@@ -614,8 +614,8 @@ function BreadcrumbMenuTrigger({
   );
 
   const contextValue = useMemo<DropdownMenuContextValue>(
-    () => ({closeMenu, menuSize}),
-    [closeMenu, menuSize],
+    () => ({closeMenu, menuSize, isMenuOpen: popover.isOpen}),
+    [closeMenu, menuSize, popover.isOpen],
   );
 
   const menuContent = Array.isArray(menu) ? renderDropdownItems(menu) : menu;

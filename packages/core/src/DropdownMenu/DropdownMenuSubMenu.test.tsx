@@ -1420,4 +1420,42 @@ describe('DropdownMenuSubMenu light dismiss of the root menu (#6893)', () => {
     expect(firstPopover).not.toHaveAttribute('popover-open');
     expect(deeperPopover).not.toHaveAttribute('popover-open');
   });
+
+  // Regression for the stale hover timer: a hover over the submenu trigger
+  // schedules an open after the show delay. A press on the same trigger
+  // cancels its own scheduled hover-open (that is the click guard), so the
+  // way a timer is still pending at close time is a close that comes from
+  // elsewhere — here the root menu's light dismiss, the #6893 case. The
+  // close must cancel the scheduled hover-open: once the delay elapses the
+  // flyout stays closed instead of reopening behind the dismissed menu.
+  // Time is driven manually so the dismiss lands inside the show delay;
+  // auto-advancing timers would let the hover-open fire before it.
+  it('cancels a hover-open scheduled before the menu was closed from elsewhere', async () => {
+    vi.useFakeTimers();
+    try {
+      render(<MoveMenu />);
+      fireEvent.click(screen.getByRole('button', {name: /Actions/}));
+      const trigger = screen.getByRole('menuitem', {
+        name: /Move to/,
+        hidden: true,
+      });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+      // Schedules the hover-open (default show delay 150ms).
+      fireEvent.mouseEnter(trigger);
+
+      // Close from elsewhere while the hover-open is still pending.
+      lightDismissRootMenu();
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+
+      // The scheduled delay passes; the flyout must stay closed.
+      await act(async () => {
+        vi.advanceTimersByTime(300);
+      });
+      expect(trigger).toHaveAttribute('aria-expanded', 'false');
+      expect(getFlyoutPopover(/Move to/)).not.toHaveAttribute('popover-open');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

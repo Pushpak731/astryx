@@ -789,10 +789,10 @@ function DropdownMenuPopover({
   // reaches them: without a sweep they keep their open state and their
   // top-layer entry while the menu is hidden, and re-anchor to the viewport
   // corner when the menu reopens (#6893). Closing them through the popover
-  // API lets useLayer's toggle handling reset their state — hidePopover on an
-  // already-closed popover is a no-op. On browsers without the popover API
-  // useLayer toggles the element's display, so mirror that and notify its
-  // reconciler with a synthetic toggle event.
+  // API lets useLayer's toggle handling reset their state. Only flyouts that
+  // are actually open are touched: `:popover-open` ships wherever
+  // `hidePopover` does (they are one API), and the display fallback keeps its
+  // own open signal (`display: block`) so it is guarded the same way.
   const hideOpenFlyouts = useCallback(() => {
     const menuPopover = contentRef.current;
     if (!menuPopover) {
@@ -806,7 +806,9 @@ function DropdownMenuPopover({
     ].reverse();
     for (const flyout of flyouts) {
       if (typeof flyout.hidePopover === 'function') {
-        flyout.hidePopover();
+        if (flyout.matches(':popover-open')) {
+          flyout.hidePopover();
+        }
       } else if (flyout.style.display === 'block') {
         flyout.style.display = 'none';
         const toggle = new Event('toggle', {bubbles: false});
@@ -1219,8 +1221,8 @@ function DropdownMenuPopover({
   const resolvedMaxHeight = menuMaxHeight == null ? null : `${menuMaxHeight}px`;
   // Context for compound items
   const contextValue = useMemo<DropdownMenuContextValue>(
-    () => ({closeMenu, menuSize, drillIn, menuLabel}),
-    [closeMenu, menuSize, drillIn, menuLabel],
+    () => ({closeMenu, menuSize, drillIn, menuLabel, isMenuOpen: isOpen}),
+    [closeMenu, menuSize, drillIn, menuLabel, isOpen],
   );
 
   // Resolve menu content: data-driven items become components

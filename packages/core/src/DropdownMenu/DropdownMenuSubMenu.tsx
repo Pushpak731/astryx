@@ -431,13 +431,17 @@ export function DropdownMenuSubMenu(
   // Hover intent and the shared hover→click guard only: this level owns its own
   // click handling, roving focus and typeahead. popover="manual", so the
   // invoker wiring other consumers need does not apply. A drill-in row has no
-  // hover: a finger drives it, and a press opens it.
+  // hover: a finger drives it, and a press opens it. Hover is also gated on
+  // the root menu being open, so a hover-open scheduled before the menu
+  // closed from elsewhere is cancelled instead of firing into the hidden
+  // menu (#6893).
+  const isRootMenuOpen = menuCtx?.isMenuOpen !== false;
   const {triggerProps, contentProps, confirmHoverOpen} =
     useMenuHover<HTMLDivElement>({
       show: showLayer,
       hide: hideLayer,
       isOpen: isFlyoutOpen,
-      isEnabled: canOpen && !isDrillIn,
+      isEnabled: canOpen && !isDrillIn && isRootMenuOpen,
       // The safe triangle toward the flyout's near edge is built from the
       // flyout this component renders, not the hook's own list ref.
       flyoutRef: menuRef,
@@ -684,8 +688,11 @@ export function DropdownMenuSubMenu(
       },
       drillIn,
       menuLabel: stringLabel,
+      // Nested rows live in this level's flyout, which the root's close
+      // sweeps; their pending hover intent dies with the root menu too.
+      isMenuOpen: isRootMenuOpen,
     }),
-    [menuSize, close, menuCtx, drillIn, stringLabel],
+    [menuSize, close, menuCtx, drillIn, stringLabel, isRootMenuOpen],
   );
 
   // The press model for this flyout: the row under a release acts, the
