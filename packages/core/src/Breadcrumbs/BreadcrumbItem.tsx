@@ -56,6 +56,7 @@ import {layerAnimations} from '../Layer/layerAnimations.stylex';
 import {renderDropdownItems} from '../DropdownMenu/renderDropdownItems';
 import {
   DropdownMenuContext,
+  DropdownMenuRootOpenContext,
   type DropdownMenuContextValue,
   type DropdownMenuSize,
 } from '../DropdownMenu/DropdownMenuContext';
@@ -614,8 +615,8 @@ function BreadcrumbMenuTrigger({
   );
 
   const contextValue = useMemo<DropdownMenuContextValue>(
-    () => ({closeMenu, menuSize, isMenuOpen: popover.isOpen}),
-    [closeMenu, menuSize, popover.isOpen],
+    () => ({closeMenu, menuSize}),
+    [closeMenu, menuSize],
   );
 
   const menuContent = Array.isArray(menu) ? renderDropdownItems(menu) : menu;
@@ -673,7 +674,9 @@ function BreadcrumbMenuTrigger({
             stylex.props(menuStyles.menu),
           )}>
           <DropdownMenuContext value={contextValue}>
-            {menuContent}
+            <DropdownMenuRootOpenContext value={popover.isOpen}>
+              {menuContent}
+            </DropdownMenuRootOpenContext>
           </DropdownMenuContext>
         </div>,
         {

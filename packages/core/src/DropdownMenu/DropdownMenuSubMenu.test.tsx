@@ -1282,7 +1282,7 @@ describe('DropdownMenuSubMenu light dismiss of the root menu (#6893)', () => {
   // directly, exactly what light dismiss does to it.
   function lightDismissRootMenu() {
     const menu = screen.getByRole('menu', {name: /Actions/, hidden: true});
-    const rootPopover = menu.closest('[popover]');
+    const rootPopover = menu.closest<HTMLElement>('[popover]');
     expect(rootPopover).not.toBeNull();
     act(() => {
       rootPopover!.hidePopover();
@@ -1291,7 +1291,7 @@ describe('DropdownMenuSubMenu light dismiss of the root menu (#6893)', () => {
 
   function getFlyoutPopover(name: RegExp) {
     const flyout = screen.getByRole('menu', {name, hidden: true});
-    return flyout.closest('[popover]');
+    return flyout.closest<HTMLElement>('[popover]');
   }
 
   it('closes an open flyout when the root menu is light-dismissed', async () => {

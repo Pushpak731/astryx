@@ -54,6 +54,7 @@ import {MenuBottomSheetActionList} from '../DropdownMenu/MenuBottomSheetActionLi
 import {renderDropdownItems} from '../DropdownMenu/renderDropdownItems';
 import {
   DropdownMenuContext,
+  DropdownMenuRootOpenContext,
   type DropdownMenuContextValue,
 } from '../DropdownMenu/DropdownMenuContext';
 import {
@@ -606,14 +607,8 @@ export function ContextMenu({
   // its own drill-in.
   const {drillIn, wrapContent} = useMenuDrillIn(isOpen && !usesBottomSheet);
   const contextValue = useMemo<DropdownMenuContextValue>(
-    () => ({
-      closeMenu,
-      menuSize: size,
-      drillIn,
-      menuLabel: label,
-      isMenuOpen: isOpen,
-    }),
-    [closeMenu, size, drillIn, label, isOpen],
+    () => ({closeMenu, menuSize: size, drillIn, menuLabel: label}),
+    [closeMenu, size, drillIn, label],
   );
 
   const resolvedMenuContent = wrapContent(
@@ -659,7 +654,9 @@ export function ContextMenu({
         style,
       )}>
       <DropdownMenuContext value={contextValue}>
-        {resolvedMenuContent}
+        <DropdownMenuRootOpenContext value={isOpen}>
+          {resolvedMenuContent}
+        </DropdownMenuRootOpenContext>
       </DropdownMenuContext>
     </div>
   );

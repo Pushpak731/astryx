@@ -92,7 +92,9 @@ import {
 } from './menuItemRoles';
 import {
   DropdownMenuContext,
+  DropdownMenuRootOpenContext,
   useDropdownMenuContext,
+  useDropdownMenuRootOpen,
   type DropdownMenuContextValue,
 } from './DropdownMenuContext';
 import {focusMenuItemOnHover} from './menuItemHover';
@@ -435,7 +437,7 @@ export function DropdownMenuSubMenu(
   // the root menu being open, so a hover-open scheduled before the menu
   // closed from elsewhere is cancelled instead of firing into the hidden
   // menu (#6893).
-  const isRootMenuOpen = menuCtx?.isMenuOpen !== false;
+  const isRootMenuOpen = useDropdownMenuRootOpen();
   const {triggerProps, contentProps, confirmHoverOpen} =
     useMenuHover<HTMLDivElement>({
       show: showLayer,
@@ -688,11 +690,8 @@ export function DropdownMenuSubMenu(
       },
       drillIn,
       menuLabel: stringLabel,
-      // Nested rows live in this level's flyout, which the root's close
-      // sweeps; their pending hover intent dies with the root menu too.
-      isMenuOpen: isRootMenuOpen,
     }),
-    [menuSize, close, menuCtx, drillIn, stringLabel, isRootMenuOpen],
+    [menuSize, close, menuCtx, drillIn, stringLabel],
   );
 
   // The press model for this flyout: the row under a release acts, the
@@ -731,6 +730,10 @@ export function DropdownMenuSubMenu(
 
   const nestedContent = (
     <DropdownMenuContext value={nestedMenuContext}>
+      {/* Nested rows live in this level's flyout, a layer of their own where
+          the layer-scoped signal resets; re-provide it so their pending
+          hover intent dies with the root menu too. */}
+      <DropdownMenuRootOpenContext value={isRootMenuOpen}>
       {isDrillIn && (
         <DropdownMenuItem
           icon={
@@ -747,6 +750,7 @@ export function DropdownMenuSubMenu(
         />
       )}
       {children}
+      </DropdownMenuRootOpenContext>
     </DropdownMenuContext>
   );
 

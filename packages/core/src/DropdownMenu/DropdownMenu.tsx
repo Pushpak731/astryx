@@ -60,6 +60,7 @@ import {
 } from './menuItemRoles';
 import {
   DropdownMenuContext,
+  DropdownMenuRootOpenContext,
   type DropdownMenuContextValue,
 } from './DropdownMenuContext';
 import {useIsomorphicLayoutEffect} from '../hooks/useIsomorphicLayoutEffect';
@@ -1221,8 +1222,8 @@ function DropdownMenuPopover({
   const resolvedMaxHeight = menuMaxHeight == null ? null : `${menuMaxHeight}px`;
   // Context for compound items
   const contextValue = useMemo<DropdownMenuContextValue>(
-    () => ({closeMenu, menuSize, drillIn, menuLabel, isMenuOpen: isOpen}),
-    [closeMenu, menuSize, drillIn, menuLabel, isOpen],
+    () => ({closeMenu, menuSize, drillIn, menuLabel}),
+    [closeMenu, menuSize, drillIn, menuLabel],
   );
 
   // Resolve menu content: data-driven items become components
@@ -1345,7 +1346,9 @@ function DropdownMenuPopover({
             style,
           )}>
           <DropdownMenuContext value={contextValue}>
-            {menuContent}
+            <DropdownMenuRootOpenContext value={isOpen}>
+              {menuContent}
+            </DropdownMenuRootOpenContext>
           </DropdownMenuContext>
         </div>,
         {
