@@ -45,6 +45,7 @@ export interface DerivedVarEntry {
 export const derivedVarRegistry: Record<string, DerivedVarEntry[]> = {
   avatar: [{property: 'borderRadius', vars: ['--_avatar-radius']}],
   banner: [{property: 'borderRadius', vars: ['--_banner-radius']}],
+  'bottom-sheet': [{property: 'padding', expand: 'container'}],
   button: [{property: 'borderRadius', vars: ['--_button-radius']}],
   card: [
     {property: 'borderRadius', vars: ['--_card-radius']},
@@ -58,6 +59,10 @@ export const derivedVarRegistry: Record<string, DerivedVarEntry[]> = {
     {property: 'borderRadius', vars: ['--_dialog-radius']},
     {property: 'padding', expand: 'container'},
   ],
+  // Drawer lives in @astryxdesign/lab; its doc source of truth is
+  // packages/lab/src/Drawer/Drawer.doc.mjs, outside this package's consistency
+  // scan. defineTheme.test.ts pins the expansion instead.
+  drawer: [{property: 'padding', expand: 'container'}],
   'context-menu': [
     {property: 'borderRadius', vars: ['--_dropdown-menu-radius']},
     {property: 'padding', vars: ['--_dropdown-menu-padding']},

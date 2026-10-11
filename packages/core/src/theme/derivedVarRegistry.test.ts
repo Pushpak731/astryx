@@ -72,6 +72,8 @@ const STRUCTURAL_VARS = new Set([
   '--layout-padding-inner-y',
   '--layout-padding-outer-x',
   '--layout-padding-outer-y',
+  '--layout-padding-own-outer-x',
+  '--layout-padding-own-outer-y',
   '--layout-content-width',
   '--appshell-header-height',
   '--dialog-dir-x',
@@ -79,6 +81,7 @@ const STRUCTURAL_VARS = new Set([
   '--indicator-color',
   '--indicator-width',
   '--table-resize-height',
+  '--table-resize-offset',
   // sticky-columns plugin: opaque backdrop (overridable) + the row overlay it
   // replays on pinned cells. Structural/runtime, not themeable design tokens.
   '--table-sticky-background',
@@ -215,11 +218,16 @@ function discoverComponents(): ComponentInfo[] {
 const DIR_TO_REGISTRY_KEY: Record<string, string> = {
   Avatar: 'avatar',
   Banner: 'banner',
+  BottomSheet: 'bottom-sheet',
   Button: 'button',
   Card: 'card',
   Chat: 'chat',
   ContextMenu: 'context-menu',
   Dialog: 'dialog',
+  // The Drawer doc file lives in packages/lab/src/Drawer, outside this
+  // package's scan; the mapping keeps the registry orphan check honest and
+  // defineTheme.test.ts pins the expansion.
+  Drawer: 'drawer',
   DropdownMenu: 'dropdown-menu',
   Field: 'field',
   HoverCard: 'hover-card',
@@ -256,6 +264,9 @@ const CROSS_COMPONENT_VARS: Record<string, string[]> = {
   // The destructive item variant recolors the Item it renders; Item owns,
   // documents and reads both slots.
   DropdownMenu: ['--_item-label-color', '--_item-description-color'],
+  // A layer content root stops an outer Stepper's connector gap; Stepper owns,
+  // documents and reads it.
+  Layer: ['--step-connector-gap'],
 };
 
 /**
@@ -281,6 +292,17 @@ const VARS_WITHOUT_DERIVED_MAPPING = new Set([
   // properties a theme author sets on the component.
   '--_thumbnail-hit-inset',
   '--_input-clear-hit-inset',
+  // The interaction overlay's fill and its transition on the ::after layer of
+  // the cards: written by the component's own hover / pressed arms (mouse
+  // `:active`, touch `data-astryx-press`), never a value a theme author sets; the
+  // overlay colours themselves are the shared interaction tokens.
+  '--_press-overlay',
+  '--_press-overlay-transition',
+  // The touch press's paint at its current strength, declared once by the
+  // shared overlay styles on the element the controller writes to and read
+  // by whatever paints it. A theme sets `--color-overlay-pressed`, not this.
+  '--_press-paint',
+  '--_press-paint-image',
   '--_input-clear-hit-content',
   // Placement and swipe lifecycle values are private Toast behavior. A theme
   // author controls the surface transform/opacity as a whole, not these values.
