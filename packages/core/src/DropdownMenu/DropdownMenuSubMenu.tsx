@@ -776,30 +776,33 @@ export function DropdownMenuSubMenu(
       : flyoutStyles.popoverCustomWidth(resolvedMenuWidth.value)
     : flyoutStyles.popover;
 
-  const nestedContent = (
+  const nestedRows = (
     <DropdownMenuContext value={nestedMenuContext}>
-      {/* Nested rows live in this level's flyout, a layer of their own where
-          the layer-scoped signal resets; re-provide it so their pending
-          hover intent dies with the root menu too. */}
-      <DropdownMenuRootOpenContext value={isRootMenuOpen}>
-        {isDrillIn && (
-          <DropdownMenuItem
-            icon={
-              <Icon
-                icon="chevronLeft"
-                size="sm"
-                color="secondary"
-                xstyle={rtlStyles.mirror}
-              />
-            }
-            label={backLabel}
-            hasCloseOnSelect={false}
-            onClick={() => close({focusTrigger: true})}
-          />
-        )}
-        {children}
-      </DropdownMenuRootOpenContext>
+      {isDrillIn && (
+        <DropdownMenuItem
+          icon={
+            <Icon
+              icon="chevronLeft"
+              size="sm"
+              color="secondary"
+              xstyle={rtlStyles.mirror}
+            />
+          }
+          label={backLabel}
+          hasCloseOnSelect={false}
+          onClick={() => close({focusTrigger: true})}
+        />
+      )}
+      {children}
     </DropdownMenuContext>
+  );
+  // Nested rows live in this level's flyout, a layer of their own where the
+  // layer-scoped signal resets; re-provide it so their pending hover intent
+  // dies with the root menu too.
+  const nestedContent = (
+    <DropdownMenuRootOpenContext value={isRootMenuOpen}>
+      {nestedRows}
+    </DropdownMenuRootOpenContext>
   );
 
   return (
