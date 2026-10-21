@@ -25,6 +25,7 @@ import {
   fireEvent,
   waitFor,
 } from '@testing-library/react';
+import {useRef} from 'react';
 import {Tooltip} from './Tooltip';
 import {useTooltip} from './useTooltip';
 import {__resetInteractionModalityForTest} from '../utils/interactionModality';
@@ -602,5 +603,51 @@ describe('Tooltip', () => {
         expect(onOpenChange).toHaveBeenCalledWith(true);
       });
     });
+  });
+});
+
+describe('Tooltip sibling mode (anchorRef)', () => {
+  // SideNavItem's collapsed rail tooltip renders the Tooltip inside the very
+  // element anchorRef points at. React attaches an ancestor's ref after its
+  // descendants' layout effects, so on mount the tooltip's effect used to see
+  // a null anchor and never retried (#7692).
+  it('attaches to an anchor it is rendered inside of', async () => {
+    const onOpenChange = vi.fn();
+    function AnchorInside() {
+      const anchorRef = useRef<HTMLDivElement>(null);
+      return (
+        <div ref={anchorRef}>
+          <button type="button">Inner</button>
+          <Tooltip
+            content="Sibling tooltip"
+            anchorRef={anchorRef}
+            delay={0}
+            onOpenChange={onOpenChange}
+          />
+        </div>
+      );
+    }
+
+    const {unmount} = render(<AnchorInside />);
+    const anchor = screen.getByRole('button', {name: 'Inner'})
+      .parentElement as HTMLElement;
+
+    // The anchor is described by the tooltip once the commit has attached refs.
+    await waitFor(() => {
+      expect(anchor.getAttribute('aria-describedby')).not.toBe('');
+    });
+    const layer = screen.getByRole('tooltip', {hidden: true});
+    expect(anchor.getAttribute('aria-describedby')).toBe(layer.id);
+
+    // Hovering the anchor opens the tooltip: the interaction listeners were
+    // attached to the late anchor too.
+    fireEvent.mouseEnter(anchor);
+    await waitFor(() => {
+      expect(onOpenChange).toHaveBeenCalledWith(true);
+    });
+
+    // Unmounting detaches: the aria-describedby the tooltip added is removed.
+    unmount();
+    expect(anchor.getAttribute('aria-describedby')).toBe(null);
   });
 });
