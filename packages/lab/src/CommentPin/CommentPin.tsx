@@ -463,7 +463,34 @@ export function CommentPin({
       type="button"
       aria-label={label}
       aria-pressed={isSelected}
-      disabled={isDisabled}
+      // A disabled pin keeps its tab stop and is announced as disabled through
+      // aria-disabled instead of the native attribute (spec:AST-085 FR1). The
+      // activation guards below keep it inert (FR2); focus is kept when the
+      // pin becomes disabled while focused (FR4), and the shared focus outline
+      // still paints, dimmed with the rest of the pin (FR6).
+      aria-disabled={isDisabled ? 'true' : undefined}
+      onClick={e => {
+        if (isDisabled) {
+          // A natively disabled element dispatched no click at all, so an
+          // aria-disabled pin must not reach the caller's handler, and the
+          // click must not leak to a clickable ancestor (annotation surface)
+          // the native attribute never let it reach either (FR2).
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        rest.onClick?.(e);
+      }}
+      // The keyboard paths to activation are Enter and Space; other keys still
+      // reach caller handlers, as on an enabled pin (FR2).
+      onKeyDown={e => {
+        if (isDisabled && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
+        rest.onKeyDown?.(e);
+      }}
       {...mergeProps(
         themeProps('comment-pin', {
           size: resolvedSize,

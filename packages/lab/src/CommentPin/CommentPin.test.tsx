@@ -229,7 +229,8 @@ describe('CommentPin', () => {
       name: 'Resolved selected annotation',
     });
     expect(marker).toHaveAttribute('aria-pressed', 'true');
-    expect(marker).toBeDisabled();
+    expect(marker).not.toBeDisabled();
+    expect(marker).toHaveAttribute('aria-disabled', 'true');
     expect(marker).toHaveAttribute('data-selected', 'selected');
     expect(marker).toHaveAttribute('data-resolved', 'resolved');
     expect(marker).toHaveAttribute('data-disabled', 'disabled');
@@ -313,6 +314,33 @@ describe('CommentPin', () => {
     expect(onClick).toHaveBeenCalledTimes(2);
   });
 
+  it('exposes aria-disabled instead of the native attribute when disabled', () => {
+    render(
+      <CommentPin label="Pending annotation" participants={[ADA]} isDisabled />,
+    );
+
+    const pin = screen.getByRole('button', {name: 'Pending annotation'});
+    expect(pin).not.toBeDisabled();
+    expect(pin).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('keeps a disabled pin in the tab order (spec:AST-085 FR1)', async () => {
+    const user = userEvent.setup();
+    render(<CommentPin label="Open annotation" participants={[ADA]} />);
+    render(
+      <CommentPin label="Pending annotation" participants={[LIN]} isDisabled />,
+    );
+    render(<CommentPin label="Another annotation" participants={[MIRA]} />);
+
+    await user.tab();
+    // The first tab stop is the enabled pin; the disabled one keeps its place
+    // right after it rather than being skipped.
+    await user.tab();
+    expect(
+      screen.getByRole('button', {name: 'Pending annotation'}),
+    ).toHaveFocus();
+  });
+
   it('does not call the click handler when disabled', () => {
     const onClick = vi.fn();
     render(
@@ -326,6 +354,61 @@ describe('CommentPin', () => {
 
     fireEvent.click(screen.getByRole('button', {name: 'Pending annotation'}));
     expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('blocks Enter and Space on a disabled pin (spec:AST-085 FR2)', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <CommentPin
+        label="Pending annotation"
+        participants={[ADA]}
+        isDisabled
+        onClick={onClick}
+      />,
+    );
+
+    const pin = screen.getByRole('button', {name: 'Pending annotation'});
+    pin.focus();
+    await user.keyboard('{Enter}');
+    await user.keyboard(' ');
+
+    expect(onClick).not.toHaveBeenCalled();
+  });
+
+  it('does not let a disabled pin activate a clickable ancestor (spec:AST-085 FR2)', () => {
+    const surfaceClick = vi.fn();
+    const onClick = vi.fn();
+    render(
+      <div role="button" onClick={surfaceClick} aria-label="Annotation surface">
+        <CommentPin
+          label="Pending annotation"
+          participants={[ADA]}
+          isDisabled
+          onClick={onClick}
+        />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByRole('button', {name: 'Pending annotation'}));
+    expect(onClick).not.toHaveBeenCalled();
+    expect(surfaceClick).not.toHaveBeenCalled();
+  });
+
+  it('keeps focus when the pin becomes disabled while focused (spec:AST-085 FR4)', () => {
+    const {rerender} = render(
+      <CommentPin label="Open annotation" participants={[ADA]} />,
+    );
+
+    const pin = screen.getByRole('button', {name: 'Open annotation'});
+    pin.focus();
+    expect(pin).toHaveFocus();
+
+    rerender(
+      <CommentPin label="Open annotation" participants={[ADA]} isDisabled />,
+    );
+    expect(pin).toHaveFocus();
+    expect(pin).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('forwards the ref and neutral button props', () => {
