@@ -206,6 +206,21 @@ const styles = stylex.create({
       '@media (forced-colors: active)': 1,
     },
   },
+  // An aria-disabled button gets no system disabled paint in forced colors;
+  // GrayText is the platform's disabled affordance there. Defaults repeat the
+  // base values, since StyleX merges per property. Only unselected pins take
+  // it — the selected treatment keeps its forced-colors Highlight, so a
+  // selected disabled pin stays prominent (ORD4).
+  disabledUnselected: {
+    borderColor: {
+      default: 'transparent',
+      '@media (forced-colors: active)': 'GrayText',
+    },
+    color: {
+      default: null,
+      '@media (forced-colors: active)': 'GrayText',
+    },
+  },
   avatarRail: {
     display: 'inline-flex',
     alignItems: 'center',
@@ -509,6 +524,7 @@ export function CommentPin({
           isDimmed && !isSelected && styles.dimmed,
           isSelected && styles.selected,
           isDisabled && styles.disabled,
+          isDisabled && !isSelected && styles.disabledUnselected,
           xstyle,
         ),
         className,

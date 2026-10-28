@@ -3,6 +3,7 @@
 import {describe, expect, it, vi} from 'vitest';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import * as stylex from '@stylexjs/stylex';
 import {CommentPin} from './CommentPin';
 
 const ADA = {id: 'ada', name: 'Ada Lovelace'};
@@ -368,12 +369,21 @@ describe('CommentPin', () => {
       />,
     );
 
+    // user-event only synthesizes the button's Enter/Space click when the
+    // keydown was not defaultPrevented, and a native listener on the pin sees
+    // any click that does reach the DOM. No click at all is what proves the
+    // keydown guard blocked activation itself, not just the click guard.
+    const nativeClicks = vi.fn();
     const pin = screen.getByRole('button', {name: 'Pending annotation'});
+    pin.addEventListener('click', nativeClicks);
+
     pin.focus();
     await user.keyboard('{Enter}');
     await user.keyboard(' ');
+    pin.removeEventListener('click', nativeClicks);
 
     expect(onClick).not.toHaveBeenCalled();
+    expect(nativeClicks).not.toHaveBeenCalled();
   });
 
   it('does not let a disabled pin activate a clickable ancestor (spec:AST-085 FR2)', () => {
@@ -396,6 +406,10 @@ describe('CommentPin', () => {
   });
 
   it('keeps focus when the pin becomes disabled while focused (spec:AST-085 FR4)', () => {
+    // jsdom keeps focus on a natively disabled button too, so on its own this
+    // cannot tell the two apart; the FR1 tests above pin the mechanism (no
+    // native `disabled`), which is what keeps focus here. A real-browser
+    // probe would be needed to prove FR4 independently.
     const {rerender} = render(
       <CommentPin label="Open annotation" participants={[ADA]} />,
     );
@@ -409,6 +423,52 @@ describe('CommentPin', () => {
     );
     expect(pin).toHaveFocus();
     expect(pin).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('paints an unselected disabled pin GrayText in forced colors (AST-085 FR6)', () => {
+    // The same declarations as the component's styles compile to the same
+    // atomic classes. Null defaults emit no atom of their own, so these are
+    // exactly the forced-colors arms — the shared default-mode atoms
+    // (borderColor: transparent) cannot make this check pass vacuously.
+    const atoms = (style: stylex.StyleXStyles) =>
+      stylex
+        .props(style)
+        .className!.split(' ')
+        .filter(name => name.includes('x') && !name.includes('__'));
+    const forced = stylex.create({
+      disabled: {
+        borderColor: {
+          default: null,
+          '@media (forced-colors: active)': 'GrayText',
+        },
+        color: {default: null, '@media (forced-colors: active)': 'GrayText'},
+      },
+    });
+    const forcedAtoms = atoms(forced.disabled);
+    expect(forcedAtoms.length).toBeGreaterThan(0);
+
+    const {rerender} = render(
+      <CommentPin label="Pending annotation" participants={[ADA]} isDisabled />,
+    );
+
+    const pin = screen.getByRole('button', {name: 'Pending annotation'});
+    for (const name of forcedAtoms) {
+      expect(pin).toHaveClass(name);
+    }
+
+    // A selected pin keeps its forced-colors Highlight treatment instead; the
+    // disabled affordance rides on the selected presentation staying intact.
+    rerender(
+      <CommentPin
+        label="Pending annotation"
+        participants={[ADA]}
+        isDisabled
+        isSelected
+      />,
+    );
+    for (const name of forcedAtoms) {
+      expect(pin).not.toHaveClass(name);
+    }
   });
 
   it('forwards the ref and neutral button props', () => {
