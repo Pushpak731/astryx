@@ -4,6 +4,7 @@ import {describe, expect, it, vi} from 'vitest';
 import {fireEvent, render, screen, waitFor} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import * as stylex from '@stylexjs/stylex';
+import {colorVars} from '@astryxdesign/core/theme/tokens.stylex';
 import {CommentPin} from './CommentPin';
 
 const ADA = {id: 'ada', name: 'Ada Lovelace'};
@@ -468,6 +469,38 @@ describe('CommentPin', () => {
     );
     for (const name of forcedAtoms) {
       expect(pin).not.toHaveClass(name);
+    }
+  });
+
+  it('keeps the root text colour on an unselected disabled pin outside forced colors', () => {
+    // disabledUnselected must repeat the root's colour token as its default:
+    // a null default would replace it under StyleX's per-property merge and
+    // the count would fall back to the raw theme text colour.
+    const atoms = (style: stylex.StyleXStyles) =>
+      stylex
+        .props(style)
+        .className!.split(' ')
+        .filter(name => name.includes('x') && !name.includes('__'));
+    const rootColor = stylex.create({
+      color: {color: colorVars['--color-text-secondary']},
+    });
+    const colorAtoms = atoms(rootColor.color);
+    expect(colorAtoms.length).toBeGreaterThan(0);
+
+    render(
+      <CommentPin
+        label="Open 3 grouped annotations"
+        participants={[ADA]}
+        threadCount={3}
+        isDisabled
+      />,
+    );
+
+    const pin = screen.getByRole('button', {
+      name: 'Open 3 grouped annotations',
+    });
+    for (const name of colorAtoms) {
+      expect(pin).toHaveClass(name);
     }
   });
 

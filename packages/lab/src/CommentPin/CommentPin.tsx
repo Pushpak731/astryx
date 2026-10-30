@@ -217,7 +217,7 @@ const styles = stylex.create({
       '@media (forced-colors: active)': 'GrayText',
     },
     color: {
-      default: null,
+      default: colorVars['--color-text-secondary'],
       '@media (forced-colors: active)': 'GrayText',
     },
   },
